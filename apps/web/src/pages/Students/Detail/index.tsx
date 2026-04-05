@@ -130,6 +130,21 @@ export function StudentDetailPage() {
     setStudent(updated)
   }
 
+  async function openChat() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: trainer } = await supabase.from('trainers').select('id').eq('user_id', user.id).single()
+    if (!trainer) return
+
+    const { data: conv } = await supabase
+      .from('conversations')
+      .upsert({ student_id: id!, trainer_id: trainer.id }, { onConflict: 'student_id,trainer_id' })
+      .select('id')
+      .single()
+
+    if (conv) navigate(`/chat/${conv.id}`)
+  }
+
   async function deleteStudent() {
     if (!student || !id) return
     if (!confirm(`Deletar ${student.name}? Isso remove o acesso do aluno permanentemente.`)) return
@@ -192,6 +207,9 @@ export function StudentDetailPage() {
                 WhatsApp
               </Button>
             </a>
+            <Button size="sm" variant="ghost" onClick={openChat}>
+              💬 Chat
+            </Button>
             <Button size="sm" variant="ghost" onClick={toggleStatus}>
               {student.status === 'active' ? 'Marcar inativo' : 'Ativar aluno'}
             </Button>

@@ -143,6 +143,19 @@ export function AlunoPage() {
   const location = [(student as any).neighborhood, (student as any).city, (student as any).state]
     .filter(Boolean).join(', ')
 
+  async function openChat() {
+    const trainerId = (student as any).trainer_id
+    if (!trainerId || !student.id) return
+
+    const { data: conv } = await supabase
+      .from('conversations')
+      .upsert({ student_id: student.id, trainer_id: trainerId }, { onConflict: 'student_id,trainer_id' })
+      .select('id')
+      .single()
+
+    if (conv) navigate(`/chat/${conv.id}`)
+  }
+
   async function approveContract() {
     await supabase
       .from('students')
@@ -202,7 +215,20 @@ export function AlunoPage() {
                 </button>
               )}
             </div>
-            <Badge variant="active" dot className="mt-2">Ativo</Badge>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="active" dot>Ativo</Badge>
+              {canEdit && (student as any).trainer_id && (
+                <button
+                  onClick={openChat}
+                  className="flex items-center gap-1 text-xs text-tz-electric hover:text-tz-electric/80 transition-colors"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                  Chat
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

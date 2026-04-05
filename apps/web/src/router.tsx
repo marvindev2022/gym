@@ -23,6 +23,7 @@ import { AlunoDefinirSenhaPage } from '@pages/Aluno/DefinirSenha'
 import { ConectarPersonalPage } from '@pages/ConectarPersonal'
 import { ProfessoresPage } from '@pages/Professores'
 import { PerfilPage } from '@pages/Perfil'
+import { ChatPage } from '@pages/Chat'
 
 async function requireAuth() {
   const { data } = await supabase.auth.getSession()
@@ -97,6 +98,10 @@ export const router = createBrowserRouter([
   {
     path: '/t/:token',
     element: <PublicWorkoutPage />,
+  },
+  {
+    path: '/chat/:conversationId',
+    element: <ChatPage />,
   },
   {
     path: '/aluno/login',
