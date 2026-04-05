@@ -558,6 +558,25 @@ export function AlunoPage() {
                     <input type="number" value={medHeight} onChange={(e) => setMedHeight(e.target.value)} placeholder="170" step="0.1" className={inputCls} />
                   </div>
                 </div>
+                {(() => {
+                  const w = parseFloat(medWeight)
+                  const h = parseFloat(medHeight)
+                  if (!w || !h || h < 50) return null
+                  const imc = w / Math.pow(h / 100, 2)
+                  const cat =
+                    imc < 18.5 ? { label: 'Abaixo do peso', cls: 'text-tz-electric' } :
+                    imc < 25   ? { label: 'Peso normal', cls: 'text-green-400' } :
+                    imc < 30   ? { label: 'Sobrepeso', cls: 'text-yellow-400' } :
+                    imc < 35   ? { label: 'Obesidade grau I', cls: 'text-orange-400' } :
+                                 { label: 'Obesidade grau II+', cls: 'text-tz-error' }
+                  return (
+                    <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-tz-surface-2 rounded-tz-sm">
+                      <span className="text-2xs text-tz-muted uppercase tracking-wide">IMC</span>
+                      <span className="font-mono font-bold text-tz-white">{imc.toFixed(1)}</span>
+                      <span className={`text-xs font-medium ${cat.cls}`}>— {cat.label}</span>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Composição corporal */}
