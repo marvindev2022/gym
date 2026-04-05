@@ -66,12 +66,14 @@ export async function getInactiveStudents(days = 7): Promise<Student[]> {
   const trainerId = await getTrainerId()
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
+  // Inativo = teve atividade mas parou há X dias
+  // OU foi cadastrado há mais de X dias e nunca treinou
   const { data, error } = await supabase
     .from('students')
     .select('*')
     .eq('trainer_id', trainerId)
     .eq('status', 'active')
-    .or(`last_activity_at.lt.${cutoff},last_activity_at.is.null`)
+    .or(`last_activity_at.lt.${cutoff},and(last_activity_at.is.null,created_at.lt.${cutoff})`)
 
   if (error) throw error
   return data as Student[]
