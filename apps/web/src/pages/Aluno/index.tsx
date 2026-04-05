@@ -106,6 +106,29 @@ export function AlunoPage() {
         </div>
       </div>
 
+      {/* CTA sem professor */}
+      {!(student as any).trainer_id && (
+        <div className="px-5 pt-5">
+          <div className="tz-card border-tz-gold/30 bg-tz-gold/5 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🏋️</span>
+              <div>
+                <p className="font-semibold text-tz-white">Você ainda não tem um professor</p>
+                <p className="text-xs text-tz-muted mt-1">
+                  Encontre um personal trainer e solicite o vínculo para começar seus treinos.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/professores')}
+              className="w-full bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors"
+            >
+              Encontrar professor →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Treinos */}
       <div className="flex-1 px-5 py-5">
         <h2 className="tz-section-title mb-4">Meus treinos</h2>
@@ -114,7 +137,11 @@ export function AlunoPage() {
           <div className="tz-card flex flex-col items-center gap-3 py-12 text-center">
             <span className="text-4xl">🏋️</span>
             <p className="text-tz-muted text-sm">Nenhum treino disponível ainda.</p>
-            <p className="text-xs text-tz-muted">Seu professor vai adicionar em breve!</p>
+            <p className="text-xs text-tz-muted">
+              {(student as any).trainer_id
+                ? 'Seu professor vai adicionar em breve!'
+                : 'Conecte-se a um professor para receber seus treinos.'}
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
