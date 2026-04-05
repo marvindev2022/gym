@@ -10,16 +10,26 @@ const BR_STATES = [
   'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
 ]
 
+const FITNESS_LEVELS = [
+  { value: 'sedentary', label: 'Sedentário' },
+  { value: 'beginner', label: 'Iniciante' },
+  { value: 'intermediate', label: 'Intermediário' },
+  { value: 'advanced', label: 'Avançado' },
+]
+
+const inputCls = 'bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50 w-full'
+const textareaCls = 'bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50 w-full resize-none'
+
 export function AlunoPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
-  const { session } = useAuth()
+  const { session, signOut } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [weekCount, setWeekCount] = useState(0)
 
-  // Edit state
+  // Edit perfil
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
@@ -29,6 +39,19 @@ export function AlunoPage() {
   const [editNeighborhood, setEditNeighborhood] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [savedOk, setSavedOk] = useState(false)
+
+  // Edit histórico médico
+  const [isEditingMed, setIsEditingMed] = useState(false)
+  const [medAge, setMedAge] = useState('')
+  const [medWeight, setMedWeight] = useState('')
+  const [medHeight, setMedHeight] = useState('')
+  const [medConditions, setMedConditions] = useState('')
+  const [medMedications, setMedMedications] = useState('')
+  const [medInjuries, setMedInjuries] = useState('')
+  const [medFitnessLevel, setMedFitnessLevel] = useState('')
+  const [medWeeklyAvailability, setMedWeeklyAvailability] = useState('')
+  const [isSavingMed, setIsSavingMed] = useState(false)
+  const [savedMedOk, setSavedMedOk] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -69,8 +92,6 @@ export function AlunoPage() {
 
     load()
 
-    // Realtime: atualiza quando aluno mudar (proposta, status, trainer_id)
-    // Realtime: atualiza quando trainer adicionar/alterar treino
     const channel = supabase
       .channel(`aluno_${token}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'students' }, () => load())
@@ -113,11 +134,53 @@ export function AlunoPage() {
       .single()
 
     setIsSaving(false)
-
     if (updated) {
       setStudent(updated as Student)
       setSavedOk(true)
       setTimeout(() => { setSavedOk(false); setIsEditing(false) }, 1500)
+    }
+  }
+
+  function openEditMed() {
+    if (!student) return
+    const s = student as any
+    setMedAge(s.age?.toString() ?? '')
+    setMedWeight(s.weight?.toString() ?? '')
+    setMedHeight(s.height?.toString() ?? '')
+    setMedConditions(s.health_conditions ?? '')
+    setMedMedications(s.medications ?? '')
+    setMedInjuries(s.injuries ?? '')
+    setMedFitnessLevel(s.fitness_level ?? '')
+    setMedWeeklyAvailability(s.weekly_availability?.toString() ?? '')
+    setIsEditingMed(true)
+  }
+
+  async function handleSaveMed(e: React.FormEvent) {
+    e.preventDefault()
+    if (!student || !session) return
+    setIsSavingMed(true)
+
+    const { data: updated } = await supabase
+      .from('students')
+      .update({
+        age: medAge ? parseInt(medAge) : null,
+        weight: medWeight ? parseFloat(medWeight) : null,
+        height: medHeight ? parseFloat(medHeight) : null,
+        health_conditions: medConditions.trim() || null,
+        medications: medMedications.trim() || null,
+        injuries: medInjuries.trim() || null,
+        fitness_level: medFitnessLevel || null,
+        weekly_availability: medWeeklyAvailability ? parseInt(medWeeklyAvailability) : null,
+      })
+      .eq('user_id', session.user.id)
+      .select('*')
+      .single()
+
+    setIsSavingMed(false)
+    if (updated) {
+      setStudent(updated as Student)
+      setSavedMedOk(true)
+      setTimeout(() => { setSavedMedOk(false); setIsEditingMed(false) }, 1500)
     }
   }
 
@@ -140,35 +203,45 @@ export function AlunoPage() {
   }
 
   const canEdit = !!session && session.user.user_metadata?.role === 'student'
+  const hasTrainer = !!(student as any).trainer_id
   const location = [(student as any).neighborhood, (student as any).city, (student as any).state]
     .filter(Boolean).join(', ')
 
-  async function openChat() {
-    const trainerId = (student as any).trainer_id
-    if (!trainerId || !student.id) return
+  const statusMap: Record<string, { variant: 'active' | 'inactive' | 'blocked' | 'pending'; label: string }> = {
+    active: { variant: 'active', label: 'Ativo' },
+    inactive: { variant: 'inactive', label: 'Inativo' },
+    blocked: { variant: 'blocked', label: 'Bloqueado' },
+    pending: { variant: 'pending', label: 'Pendente' },
+    awaiting_approval: { variant: 'pending', label: 'Aguardando aprovação' },
+  }
+  const statusInfo = statusMap[student.status] ?? { variant: 'inactive' as const, label: student.status }
 
+  const s = student as any
+
+  async function handleLogout() {
+    await signOut()
+    navigate('/aluno/login')
+  }
+
+  async function openChat() {
+    if (!hasTrainer || !student.id || !session) return
     const { data: conv } = await supabase
       .from('conversations')
-      .upsert({ student_id: student.id, trainer_id: trainerId }, { onConflict: 'student_id,trainer_id' })
+      .upsert({ student_id: student.id, trainer_id: s.trainer_id }, { onConflict: 'student_id,trainer_id' })
       .select('id')
       .single()
-
     if (conv) navigate(`/chat/${conv.id}`)
   }
 
   async function approveContract() {
-    await supabase
-      .from('students')
-      .update({ status: 'active' })
-      .eq('student_token', token)
+    await supabase.from('students').update({ status: 'active' }).eq('student_token', token)
     setStudent((prev) => prev ? { ...prev, status: 'active' } as any : prev)
   }
 
   async function declineContract() {
-    await supabase
-      .from('students')
-      .update({ status: 'pending', trainer_id: null, monthly_fee: null, payment_due_day: null, proposal_message: null })
-      .eq('student_token', token)
+    await supabase.from('students').update({
+      status: 'pending', trainer_id: null, monthly_fee: null, payment_due_day: null, proposal_message: null,
+    }).eq('student_token', token)
     setStudent((prev) => prev ? { ...prev, status: 'pending', trainer_id: null } as any : prev)
   }
 
@@ -176,11 +249,25 @@ export function AlunoPage() {
     <div className="min-h-[100dvh] bg-tz-bg flex flex-col max-w-lg mx-auto">
       {/* Header */}
       <div className="px-5 pt-8 pb-5 border-b border-tz-border">
-        <div className="flex items-center gap-2 mb-5">
-          <div className="h-6 w-6 rounded bg-tz-gold flex items-center justify-center">
-            <span className="text-tz-bg font-bold text-xs">TZ</span>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded bg-tz-gold flex items-center justify-center">
+              <span className="text-tz-bg font-bold text-xs">TZ</span>
+            </div>
+            <span className="text-xs text-tz-muted font-medium">TreinoZap</span>
           </div>
-          <span className="text-xs text-tz-muted font-medium">TreinoZap</span>
+          {/* Logout mobile — sempre visível quando autenticado */}
+          {canEdit && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs text-tz-muted hover:text-tz-error transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+              </svg>
+              Sair
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -189,9 +276,7 @@ export function AlunoPage() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h1 className="text-xl font-bold text-tz-white">{student.name}</h1>
-                {student.goal && (
-                  <p className="text-sm text-tz-muted mt-0.5">{student.goal}</p>
-                )}
+                {student.goal && <p className="text-sm text-tz-muted mt-0.5">{student.goal}</p>}
                 {location && (
                   <p className="text-xs text-tz-muted/70 mt-0.5 flex items-center gap-1">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -215,9 +300,10 @@ export function AlunoPage() {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="active" dot>Ativo</Badge>
-              {canEdit && (student as any).trainer_id && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <Badge variant={statusInfo.variant} dot>{statusInfo.label}</Badge>
+              {/* Chat: disponível sempre que tiver sessão e professor */}
+              {session && hasTrainer && (
                 <button
                   onClick={openChat}
                   className="flex items-center gap-1 text-xs text-tz-electric hover:text-tz-electric/80 transition-colors"
@@ -232,85 +318,43 @@ export function AlunoPage() {
           </div>
         </div>
 
-        {/* Form edição */}
+        {/* Form edição perfil */}
         {isEditing && (
           <form onSubmit={handleSave} className="mt-5 flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Nome</label>
-                <input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
-                />
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} className={inputCls} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Telefone</label>
-                <input
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="5511999999999"
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
-                />
+                <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="5511999999999" className={inputCls} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Objetivo</label>
-                <input
-                  value={editGoal}
-                  onChange={(e) => setEditGoal(e.target.value)}
-                  placeholder="Ex: emagrecer"
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
-                />
+                <input value={editGoal} onChange={(e) => setEditGoal(e.target.value)} placeholder="Ex: emagrecer" className={inputCls} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Cidade</label>
-                <input
-                  value={editCity}
-                  onChange={(e) => setEditCity(e.target.value)}
-                  placeholder="São Paulo"
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
-                />
+                <input value={editCity} onChange={(e) => setEditCity(e.target.value)} placeholder="São Paulo" className={inputCls} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Estado</label>
-                <select
-                  value={editState}
-                  onChange={(e) => setEditState(e.target.value)}
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white focus:outline-none focus:border-tz-gold/50"
-                >
+                <select value={editState} onChange={(e) => setEditState(e.target.value)} className={inputCls}>
                   <option value="">UF</option>
-                  {BR_STATES.map((uf) => (
-                    <option key={uf} value={uf}>{uf}</option>
-                  ))}
+                  {BR_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
                 </select>
               </div>
               <div className="col-span-2 flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Bairro</label>
-                <input
-                  value={editNeighborhood}
-                  onChange={(e) => setEditNeighborhood(e.target.value)}
-                  placeholder="Vila Madalena"
-                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
-                />
+                <input value={editNeighborhood} onChange={(e) => setEditNeighborhood(e.target.value)} placeholder="Vila Madalena" className={inputCls} />
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className={`flex-1 py-2 rounded-tz text-sm font-semibold transition-colors ${
-                  savedOk
-                    ? 'bg-tz-gold text-tz-bg'
-                    : 'bg-tz-electric/10 text-tz-electric hover:bg-tz-electric/20'
-                }`}
-              >
+              <button type="submit" disabled={isSaving} className={`flex-1 py-2 rounded-tz text-sm font-semibold transition-colors ${savedOk ? 'bg-tz-gold text-tz-bg' : 'bg-tz-electric/10 text-tz-electric hover:bg-tz-electric/20'}`}>
                 {savedOk ? '✓ Salvo!' : isSaving ? 'Salvando...' : 'Salvar'}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 rounded-tz text-sm text-tz-muted hover:text-tz-white transition-colors"
-              >
+              <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-tz text-sm text-tz-muted hover:text-tz-white transition-colors">
                 Cancelar
               </button>
             </div>
@@ -327,7 +371,7 @@ export function AlunoPage() {
         </div>
       </div>
 
-      {/* Proposta de contrato aguardando aprovação */}
+      {/* Proposta de contrato */}
       {student.status === 'awaiting_approval' && (
         <div className="px-5 pt-5">
           <div className="tz-card border-tz-gold/40 bg-tz-gold/5 flex flex-col gap-4">
@@ -338,41 +382,30 @@ export function AlunoPage() {
                 <p className="text-xs text-tz-muted mt-0.5">Revise os valores e aceite para começar</p>
               </div>
             </div>
-
             <div className="flex gap-4">
-              {(student as any).monthly_fee && (
+              {s.monthly_fee && (
                 <div>
                   <p className="text-2xs text-tz-muted uppercase tracking-wide">Mensalidade</p>
                   <p className="font-mono text-xl font-bold text-tz-gold mt-0.5">
-                    R${(student as any).monthly_fee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R${s.monthly_fee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               )}
-              {(student as any).payment_due_day && (
+              {s.payment_due_day && (
                 <div>
                   <p className="text-2xs text-tz-muted uppercase tracking-wide">Vence dia</p>
-                  <p className="font-mono text-xl font-bold text-tz-white mt-0.5">{(student as any).payment_due_day}</p>
+                  <p className="font-mono text-xl font-bold text-tz-white mt-0.5">{s.payment_due_day}</p>
                 </div>
               )}
             </div>
-
-            {(student as any).proposal_message && (
-              <p className="text-xs text-tz-muted italic border-l-2 border-tz-gold/30 pl-3">
-                "{(student as any).proposal_message}"
-              </p>
+            {s.proposal_message && (
+              <p className="text-xs text-tz-muted italic border-l-2 border-tz-gold/30 pl-3">"{s.proposal_message}"</p>
             )}
-
             <div className="flex gap-2">
-              <button
-                onClick={approveContract}
-                className="flex-1 bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors"
-              >
+              <button onClick={approveContract} className="flex-1 bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors">
                 Aceitar proposta ✓
               </button>
-              <button
-                onClick={declineContract}
-                className="px-4 py-2.5 rounded-tz text-sm text-tz-muted border border-tz-border hover:text-tz-error hover:border-tz-error/30 transition-colors"
-              >
+              <button onClick={declineContract} className="px-4 py-2.5 rounded-tz text-sm text-tz-muted border border-tz-border hover:text-tz-error hover:border-tz-error/30 transition-colors">
                 Recusar
               </button>
             </div>
@@ -380,28 +413,187 @@ export function AlunoPage() {
         </div>
       )}
 
+      {/* Info financeira — aluno ativo */}
+      {student.status === 'active' && (s.monthly_fee || s.payment_due_day) && (
+        <div className="px-5 pt-5">
+          <div className="tz-card flex flex-col gap-3">
+            <p className="text-xs font-semibold text-tz-muted uppercase tracking-wide">Financeiro</p>
+            <div className="flex gap-6">
+              {s.monthly_fee && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide">Mensalidade</p>
+                  <p className="font-mono text-xl font-bold text-tz-gold mt-0.5">
+                    R${s.monthly_fee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
+              {s.payment_due_day && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide">Vence dia</p>
+                  <p className="font-mono text-xl font-bold text-tz-white mt-0.5">{s.payment_due_day}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CTA sem professor */}
-      {!(student as any).trainer_id && (
+      {!hasTrainer && (
         <div className="px-5 pt-5">
           <div className="tz-card border-tz-gold/30 bg-tz-gold/5 flex flex-col gap-3">
             <div className="flex items-start gap-3">
               <span className="text-2xl shrink-0">🏋️</span>
               <div>
                 <p className="font-semibold text-tz-white">Você ainda não tem um professor</p>
-                <p className="text-xs text-tz-muted mt-1">
-                  Encontre um personal trainer e solicite o vínculo para começar seus treinos.
-                </p>
+                <p className="text-xs text-tz-muted mt-1">Encontre um personal trainer para começar seus treinos.</p>
               </div>
             </div>
-            <button
-              onClick={() => navigate('/professores')}
-              className="w-full bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors"
-            >
+            <button onClick={() => navigate('/professores')} className="w-full bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors">
               Encontrar professor →
             </button>
           </div>
         </div>
       )}
+
+      {/* Histórico médico */}
+      <div className="px-5 pt-5">
+        <div className="tz-card flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-tz-muted uppercase tracking-wide">Histórico médico / Avaliação</p>
+            {canEdit && !isEditingMed && (
+              <button onClick={openEditMed} className="text-tz-muted hover:text-tz-white transition-colors" title="Editar histórico">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {isEditingMed ? (
+            <form onSubmit={handleSaveMed} className="flex flex-col gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Idade</label>
+                  <input type="number" value={medAge} onChange={(e) => setMedAge(e.target.value)} placeholder="30" min="1" max="120" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Peso (kg)</label>
+                  <input type="number" value={medWeight} onChange={(e) => setMedWeight(e.target.value)} placeholder="70" step="0.1" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Altura (cm)</label>
+                  <input type="number" value={medHeight} onChange={(e) => setMedHeight(e.target.value)} placeholder="170" step="0.1" className={inputCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Nível de condicionamento</label>
+                  <select value={medFitnessLevel} onChange={(e) => setMedFitnessLevel(e.target.value)} className={inputCls}>
+                    <option value="">Selecionar</option>
+                    {FITNESS_LEVELS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Dias/semana disponíveis</label>
+                  <input type="number" value={medWeeklyAvailability} onChange={(e) => setMedWeeklyAvailability(e.target.value)} placeholder="3" min="1" max="7" className={inputCls} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Condições de saúde</label>
+                <textarea value={medConditions} onChange={(e) => setMedConditions(e.target.value)} placeholder="Ex: hipertensão, diabetes..." rows={2} className={textareaCls} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Medicamentos em uso</label>
+                <textarea value={medMedications} onChange={(e) => setMedMedications(e.target.value)} placeholder="Ex: losartana 50mg..." rows={2} className={textareaCls} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Lesões / limitações físicas</label>
+                <textarea value={medInjuries} onChange={(e) => setMedInjuries(e.target.value)} placeholder="Ex: hérnia de disco L4-L5..." rows={2} className={textareaCls} />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={isSavingMed} className={`flex-1 py-2 rounded-tz text-sm font-semibold transition-colors ${savedMedOk ? 'bg-tz-gold text-tz-bg' : 'bg-tz-electric/10 text-tz-electric hover:bg-tz-electric/20'}`}>
+                  {savedMedOk ? '✓ Salvo!' : isSavingMed ? 'Salvando...' : 'Salvar histórico'}
+                </button>
+                <button type="button" onClick={() => setIsEditingMed(false)} className="px-4 py-2 rounded-tz text-sm text-tz-muted hover:text-tz-white transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* Dados biométricos */}
+              {(s.age || s.weight || s.height) && (
+                <div className="flex gap-4">
+                  {s.age && (
+                    <div>
+                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Idade</p>
+                      <p className="font-mono text-sm font-bold text-tz-white mt-0.5">{s.age} anos</p>
+                    </div>
+                  )}
+                  {s.weight && (
+                    <div>
+                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Peso</p>
+                      <p className="font-mono text-sm font-bold text-tz-white mt-0.5">{s.weight} kg</p>
+                    </div>
+                  )}
+                  {s.height && (
+                    <div>
+                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Altura</p>
+                      <p className="font-mono text-sm font-bold text-tz-white mt-0.5">{s.height} cm</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(s.fitness_level || s.weekly_availability) && (
+                <div className="flex gap-4">
+                  {s.fitness_level && (
+                    <div>
+                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Condicionamento</p>
+                      <p className="text-sm text-tz-white mt-0.5">{FITNESS_LEVELS.find((f) => f.value === s.fitness_level)?.label ?? s.fitness_level}</p>
+                    </div>
+                  )}
+                  {s.weekly_availability && (
+                    <div>
+                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Disponibilidade</p>
+                      <p className="text-sm text-tz-white mt-0.5">{s.weekly_availability}x/semana</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {s.health_conditions && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide mb-1">Condições de saúde</p>
+                  <p className="text-sm text-tz-white">{s.health_conditions}</p>
+                </div>
+              )}
+              {s.medications && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide mb-1">Medicamentos</p>
+                  <p className="text-sm text-tz-white">{s.medications}</p>
+                </div>
+              )}
+              {s.injuries && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide mb-1">Lesões / limitações</p>
+                  <p className="text-sm text-tz-white">{s.injuries}</p>
+                </div>
+              )}
+              {!s.age && !s.weight && !s.height && !s.health_conditions && !s.medications && !s.injuries && !s.fitness_level && (
+                <p className="text-sm text-tz-muted text-center py-2">
+                  {canEdit ? 'Preencha seu histórico médico para ajudar seu professor.' : 'Nenhuma informação médica registrada.'}
+                </p>
+              )}
+              {canEdit && (
+                <button onClick={openEditMed} className="text-xs text-tz-electric hover:text-tz-electric/80 transition-colors self-start">
+                  + Preencher / atualizar histórico
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Treinos */}
       <div className="flex-1 px-5 py-5">
@@ -412,9 +604,7 @@ export function AlunoPage() {
             <span className="text-4xl">🏋️</span>
             <p className="text-tz-muted text-sm">Nenhum treino disponível ainda.</p>
             <p className="text-xs text-tz-muted">
-              {(student as any).trainer_id
-                ? 'Seu professor vai adicionar em breve!'
-                : 'Conecte-se a um professor para receber seus treinos.'}
+              {hasTrainer ? 'Seu professor vai adicionar em breve!' : 'Conecte-se a um professor para receber seus treinos.'}
             </p>
           </div>
         ) : (
@@ -424,21 +614,20 @@ export function AlunoPage() {
               return (
                 <button
                   key={workout.id}
-                  onClick={() => navigate(`/t/${workout.public_token}`)}
+                  onClick={() => navigate(`/t/${(workout as any).public_token}`)}
                   className="tz-card w-full text-left hover:border-tz-gold/40 transition-colors active:scale-[0.98]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-tz-white truncate">{workout.title}</h3>
-                      {workout.description && (
-                        <p className="text-xs text-tz-muted mt-1 line-clamp-2">{workout.description}</p>
+                      {(workout as any).description && (
+                        <p className="text-xs text-tz-muted mt-1 line-clamp-2">{(workout as any).description}</p>
                       )}
                     </div>
                     <svg className="text-tz-muted shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M9 18l6-6-6-6"/>
                     </svg>
                   </div>
-
                   <div className="flex items-center gap-4 mt-4">
                     <div>
                       <span className="text-2xs text-tz-muted uppercase tracking-wide">Exercícios</span>
@@ -462,9 +651,11 @@ export function AlunoPage() {
         <p className="text-xs text-tz-muted">
           Powered by <span className="text-tz-gold font-medium">TreinoZap</span>
         </p>
-        <a href="/aluno/login" className="text-xs text-tz-muted underline underline-offset-2 hover:text-tz-white transition-colors">
-          Acessar com meu email
-        </a>
+        {!canEdit && (
+          <a href="/aluno/login" className="text-xs text-tz-muted underline underline-offset-2 hover:text-tz-white transition-colors">
+            Acessar com meu email
+          </a>
+        )}
       </div>
     </div>
   )

@@ -243,6 +243,90 @@ export function StudentDetailPage() {
         </div>
       )}
 
+      {/* Histórico médico / Avaliação */}
+      {(() => {
+        const s = student as any
+        const hasMed = s.age || s.weight || s.height || s.health_conditions || s.medications || s.injuries || s.fitness_level || s.weekly_availability
+        const fitnessLabels: Record<string, string> = {
+          sedentary: 'Sedentário', beginner: 'Iniciante', intermediate: 'Intermediário', advanced: 'Avançado',
+        }
+        return (
+          <div className="tz-card flex flex-col gap-4">
+            <h2 className="tz-section-title">Histórico médico / Avaliação</h2>
+            {!hasMed ? (
+              <p className="text-sm text-tz-muted">Aluno ainda não preencheu o histórico médico.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {(s.age || s.weight || s.height) && (
+                  <div className="flex gap-5 flex-wrap">
+                    {s.age && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Idade</span>
+                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.age} anos</p>
+                      </div>
+                    )}
+                    {s.weight && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Peso</span>
+                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.weight} kg</p>
+                      </div>
+                    )}
+                    {s.height && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Altura</span>
+                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.height} cm</p>
+                      </div>
+                    )}
+                    {s.age && s.height && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">IMC</span>
+                        <p className="font-mono text-base font-bold text-tz-electric mt-0.5">
+                          {(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {(s.fitness_level || s.weekly_availability) && (
+                  <div className="flex gap-5 flex-wrap">
+                    {s.fitness_level && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Condicionamento</span>
+                        <p className="text-sm text-tz-white mt-0.5">{fitnessLabels[s.fitness_level] ?? s.fitness_level}</p>
+                      </div>
+                    )}
+                    {s.weekly_availability && (
+                      <div>
+                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Disponibilidade</span>
+                        <p className="text-sm text-tz-white mt-0.5">{s.weekly_availability}x/semana</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {s.health_conditions && (
+                  <div>
+                    <span className="text-2xs text-tz-muted uppercase tracking-wide">Condições de saúde</span>
+                    <p className="text-sm text-tz-white mt-1 bg-tz-surface-2 rounded-tz px-3 py-2">{s.health_conditions}</p>
+                  </div>
+                )}
+                {s.medications && (
+                  <div>
+                    <span className="text-2xs text-tz-muted uppercase tracking-wide">Medicamentos</span>
+                    <p className="text-sm text-tz-white mt-1 bg-tz-surface-2 rounded-tz px-3 py-2">{s.medications}</p>
+                  </div>
+                )}
+                {s.injuries && (
+                  <div>
+                    <span className="text-2xs text-tz-muted uppercase tracking-wide">Lesões / limitações</span>
+                    <p className="text-sm text-tz-error mt-1 bg-tz-error/5 rounded-tz px-3 py-2 border border-tz-error/20">{s.injuries}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Treinos */}
       <section>
         <div className="flex items-center justify-between mb-3">
