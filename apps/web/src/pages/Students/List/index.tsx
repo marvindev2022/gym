@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, StudentCard } from '@treinozap/ui'
 import { useStudents } from '@hooks/useStudents'
+import { buildActivationMessage } from '@services/notifications'
+import { supabase } from '@lib/supabase'
 import type { StudentStatus } from '@treinozap/types'
 
 const statusOptions: { value: 'all' | StudentStatus; label: string }[] = [
   { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Aguardando' },
   { value: 'active', label: 'Ativos' },
   { value: 'inactive', label: 'Inativos' },
   { value: 'blocked', label: 'Bloqueados' },
@@ -16,6 +19,15 @@ export function StudentsListPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | StudentStatus>('all')
+  const [trainerName, setTrainerName] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('trainers').select('name').eq('user_id', user.id).single()
+        .then(({ data }) => { if (data) setTrainerName(data.name) })
+    })
+  }, [])
 
   const filtered = students.filter((s) => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase())
@@ -73,6 +85,18 @@ export function StudentsListPage() {
               key={student.id}
               {...student}
               lastActivityAt={student.last_activity_at}
+              whatsappMessage={
+                student.status === 'pending'
+                  ? buildActivationMessage({
+                      studentName: student.name,
+                      trainerName,
+                      email: student.email,
+                      portalUrl: student.student_token
+                        ? `${window.location.origin}/aluno/${student.student_token}`
+                        : window.location.origin,
+                    })
+                  : undefined
+              }
               onClick={() => navigate(`/students/${student.id}`)}
             />
           ))}
