@@ -21,6 +21,7 @@ import { AlunoPage } from '@pages/Aluno'
 import { AlunoLoginPage } from '@pages/Aluno/Login'
 import { AlunoDefinirSenhaPage } from '@pages/Aluno/DefinirSenha'
 import { ConectarPersonalPage } from '@pages/ConectarPersonal'
+import { ProfessoresPage } from '@pages/Professores'
 
 async function requireAuth() {
   const { data } = await supabase.auth.getSession()
@@ -86,6 +87,10 @@ export const router = createBrowserRouter([
   {
     path: '/conectar-personal',
     element: <ConectarPersonalPage />,
+  },
+  {
+    path: '/professores',
+    element: <ProfessoresPage />,
   },
   {
     path: '/t/:token',

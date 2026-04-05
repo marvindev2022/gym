@@ -105,6 +105,8 @@ export function StudentDetailPage() {
   const [student, setStudent] = useState<Student | null>(null)
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -128,13 +130,24 @@ export function StudentDetailPage() {
     setStudent(updated)
   }
 
+  async function deleteStudent() {
+    if (!student || !id) return
+    if (!confirm(`Deletar ${student.name}? Isso remove o acesso do aluno permanentemente.`)) return
+    setIsDeleting(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    await supabase.functions.invoke('delete-student', {
+      body: { studentId: id },
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+    })
+    navigate('/students', { replace: true })
+  }
+
   if (isLoading) return <div className="text-center py-12 text-tz-muted">Carregando...</div>
   if (!student) return <div className="text-center py-12 text-tz-error">Aluno não encontrado</div>
 
   const rawPhone = student.phone.replace(/\D/g, '')
   const whatsappUrl = `https://wa.me/${rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`}`
   const statusVariant = student.status === 'active' ? 'active' : student.status === 'inactive' ? 'inactive' : 'blocked'
-  const [copiedLink, setCopiedLink] = useState(false)
   const studentLink = `${window.location.origin}/aluno/${(student as any).student_token}`
 
   async function copyStudentLink() {
@@ -181,6 +194,9 @@ export function StudentDetailPage() {
             </a>
             <Button size="sm" variant="ghost" onClick={toggleStatus}>
               {student.status === 'active' ? 'Marcar inativo' : 'Ativar aluno'}
+            </Button>
+            <Button size="sm" variant="danger" onClick={deleteStudent} isLoading={isDeleting}>
+              Deletar
             </Button>
           </div>
         </div>

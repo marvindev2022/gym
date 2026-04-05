@@ -16,7 +16,7 @@ export function AlunoDefinirSenhaPage() {
   useEffect(() => {
     // Supabase troca o token do invite automaticamente ao detectar os params na URL
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') && session?.user) {
         setUserName(session.user.user_metadata?.student_name ?? '')
         setStep('form')
       } else if (event === 'SIGNED_OUT') {

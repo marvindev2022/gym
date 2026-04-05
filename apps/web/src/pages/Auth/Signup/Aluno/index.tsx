@@ -31,7 +31,15 @@ export function SignupAlunoPage() {
       options: { data: { role: 'student', name: data.name } },
     })
 
-    if (signupError) { setApiError(signupError.message); return }
+    if (signupError) {
+      const msg = signupError.message.toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already been invited') || msg.includes('user already')) {
+        setApiError('Esse email já foi cadastrado. Verifique seu email pelo link de convite do professor, ou acesse o login de aluno.')
+      } else {
+        setApiError(signupError.message)
+      }
+      return
+    }
 
     if (authData.user) {
       const { error: studentError } = await supabase.from('students').insert({

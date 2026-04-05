@@ -41,9 +41,22 @@ Deno.serve(async (req) => {
   })
 
   if (error) {
-    // Ignora erro se usuário já foi convidado antes
-    if (error.message.includes('already been invited') || error.message.includes('already registered')) {
-      return new Response(JSON.stringify({ success: true, note: 'já convidado anteriormente' }), {
+    const alreadyExists = error.message.includes('already been invited') || error.message.includes('already registered')
+
+    if (alreadyExists) {
+      // Usuário já existe no Auth — reenvia link de acesso via reset de senha
+      const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      })
+
+      if (resetError) {
+        return new Response(JSON.stringify({ error: resetError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({ success: true, note: 'link de acesso reenviado' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

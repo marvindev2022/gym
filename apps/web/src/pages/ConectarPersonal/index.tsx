@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@lib/supabase'
 import { Button, Input } from '@treinozap/ui'
 
@@ -14,21 +14,26 @@ type TrainerPreview = {
 
 export function ConectarPersonalPage() {
   const navigate = useNavigate()
-  const [code, setCode] = useState('')
+  const [searchParams] = useSearchParams()
+  const [code, setCode] = useState(searchParams.get('code') ?? '')
   const [step, setStep] = useState<Step>('form')
   const [trainer, setTrainer] = useState<TrainerPreview | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  async function searchTrainer(e: React.FormEvent) {
-    e.preventDefault()
+  // Auto-busca se chegou com ?code= na URL
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code')
+    if (codeFromUrl) doSearch(codeFromUrl)
+  }, [])
+
+  async function doSearch(codeValue: string) {
     setError(null)
     setStep('loading')
-
     const { data } = await supabase
       .from('trainers')
       .select('id, name, bio, specialty')
-      .eq('code', code.trim().toLowerCase())
+      .eq('code', codeValue.trim().toLowerCase())
       .single()
 
     if (!data) {
@@ -36,9 +41,13 @@ export function ConectarPersonalPage() {
       setStep('form')
       return
     }
-
     setTrainer(data)
     setStep('found')
+  }
+
+  async function searchTrainer(e: React.FormEvent) {
+    e.preventDefault()
+    doSearch(code)
   }
 
   async function sendRequest() {
@@ -76,7 +85,7 @@ export function ConectarPersonalPage() {
       if (student.student_token) {
         navigate(`/aluno/${student.student_token}`)
       } else {
-        navigate('/meu-portal')
+        navigate('/professores')
       }
     }, 3000)
   }
