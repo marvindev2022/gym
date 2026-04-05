@@ -133,6 +133,15 @@ export function AppLayout() {
               {item.label}
             </NavLink>
           ))}
+          <button
+            onClick={handleSignOut}
+            className="flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-tz-muted transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Sair
+          </button>
         </nav>
       </div>
     </div>
