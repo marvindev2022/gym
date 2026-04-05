@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@contexts/auth'
+import { usePushNotifications } from '@hooks/usePushNotifications'
 
 const navItems = [
   {
@@ -49,6 +50,7 @@ const navItems = [
 export function AppLayout() {
   const { signOut } = useAuth()
   const navigate = useNavigate()
+  const { status: pushStatus, subscribe } = usePushNotifications()
 
   async function handleSignOut() {
     await signOut()
@@ -85,7 +87,18 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="px-3 pb-4">
+        <div className="px-3 pb-4 flex flex-col gap-1">
+          {pushStatus === 'default' && (
+            <button
+              onClick={subscribe}
+              className="flex w-full items-center gap-3 rounded-tz-sm px-3 py-2.5 text-sm font-medium text-tz-gold hover:bg-tz-gold/10 transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              Ativar notificações
+            </button>
+          )}
           <button
             onClick={handleSignOut}
             className="flex w-full items-center gap-3 rounded-tz-sm px-3 py-2.5 text-sm font-medium text-tz-muted hover:text-tz-error hover:bg-tz-error/10 transition-colors"

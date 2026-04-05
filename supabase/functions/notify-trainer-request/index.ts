@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,6 +41,46 @@ Deno.serve(async (req) => {
 
   const notifications: Promise<void>[] = []
 
+  // --- Web Push ---
+  const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')
+  const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')
+  const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:contato@treinozap.com.br'
+
+  if (vapidPublic && vapidPrivate && trainer.user_id) {
+    const { data: sub } = await supabaseAdmin
+      .from('push_subscriptions')
+      .select('subscription')
+      .eq('user_id', trainer.user_id)
+      .single()
+
+    if (sub?.subscription) {
+      webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
+
+      const payload = JSON.stringify({
+        title: '🏋️ Nova solicitação de aluno!',
+        body: student_message
+          ? `${student_name}: "${student_message}"`
+          : `${student_name} quer se conectar com você.`,
+        url: `${app_url ?? 'https://treinozap.com.br'}/dashboard`,
+      })
+
+      notifications.push(
+        webpush.sendNotification(sub.subscription, payload)
+          .then(() => {})
+          .catch(async (e: any) => {
+            console.error('[notify] Web Push error:', e?.statusCode, e?.body)
+            // Se a subscription expirou, remove do banco
+            if (e?.statusCode === 410) {
+              await supabaseAdmin
+                .from('push_subscriptions')
+                .delete()
+                .eq('user_id', trainer.user_id)
+            }
+          })
+      )
+    }
+  }
+
   // --- WhatsApp via Evolution API ---
   const evolutionUrl = Deno.env.get('EVOLUTION_API_URL')
   const evolutionKey = Deno.env.get('EVOLUTION_API_KEY')
@@ -48,14 +89,13 @@ Deno.serve(async (req) => {
   if (evolutionUrl && evolutionKey && trainer.phone) {
     const phone = trainer.phone.replace(/\D/g, '')
     const number = phone.startsWith('55') ? phone : `55${phone}`
-
     const text = [
       `🏋️ *Nova solicitação de aluno!*`,
       ``,
       `*${student_name}* quer se conectar com você no TreinoZap.`,
       student_message ? `\nMensagem: _"${student_message}"_` : '',
       ``,
-      `Acesse a plataforma para aceitar ou recusar:`,
+      `Acesse para aceitar ou recusar:`,
       `👉 ${app_url ?? 'https://treinozap.com.br'}/dashboard`,
     ].filter(s => s !== undefined).join('\n')
 
@@ -73,7 +113,6 @@ Deno.serve(async (req) => {
   const fromEmail = Deno.env.get('FROM_EMAIL') ?? 'noreply@treinozap.com.br'
 
   if (resendKey && trainer.user_id) {
-    // Busca email do trainer via auth admin
     const { data: { user: trainerUser } } = await supabaseAdmin.auth.admin.getUserById(trainer.user_id)
 
     if (trainerUser?.email) {
@@ -87,17 +126,12 @@ Deno.serve(async (req) => {
              style="display:inline-block;margin-top:16px;padding:12px 24px;background:#C9A84C;color:#000;text-decoration:none;border-radius:6px;font-weight:bold">
             Ver solicitação →
           </a>
-          <p style="margin-top:24px;color:#999;font-size:12px">TreinoZap — Plataforma para personal trainers</p>
         </div>
       `
-
       notifications.push(
         fetch('https://api.resend.com/emails', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${resendKey}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
           body: JSON.stringify({
             from: fromEmail,
             to: trainerUser.email,
