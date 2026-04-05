@@ -15,31 +15,35 @@ export function PublicWorkoutPage() {
     if (!token) return
     getWorkoutByToken(token).then((w) => {
       setWorkout(w)
-      if (w) {
-        logWorkoutActivity(w.id, (w as any).student_id ?? null, 'viewed_workout')
-        // Marca in_progress assim que o aluno abre
-        if ((w as any).status === 'active') {
-          updateWorkoutStatus(w.id, 'in_progress')
-        }
-        if ((w as any).status === 'completed') {
-          setIsCompleted(true)
-        }
+      if (!w) return
+
+      logWorkoutActivity(w.id, (w as any).student_id ?? null, 'viewed_workout')
+
+      const status = (w as any).status ?? 'active'
+
+      if (status === 'completed') {
+        // Já foi concluído antes → mostra como concluído imediatamente
+        setIsCompleted(true)
+      } else if (status === 'active') {
+        // Primeira abertura → marca in_progress via Edge Function
+        updateWorkoutStatus(w.id, (w as any).public_token, 'in_progress')
       }
+      // 'in_progress' → já estava em andamento, não faz nada (checkboxes zerados — normal)
     }).finally(() => setIsLoading(false))
   }, [token])
 
   function toggleExercise(id: string, total: number) {
-    if (isCompleted) return
+    if (isCompleted || !workout) return
     setChecked(prev => {
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
       } else {
         next.add(id)
-        // Todos marcados → completa o treino
-        if (next.size === total && workout) {
+        if (next.size === total) {
+          // Todos marcados → completa
           setIsCompleted(true)
-          updateWorkoutStatus(workout.id, 'completed')
+          updateWorkoutStatus(workout.id, (workout as any).public_token, 'completed')
           logWorkoutActivity(workout.id, (workout as any).student_id ?? null, 'completed_workout')
         }
       }
@@ -117,16 +121,12 @@ export function PublicWorkoutPage() {
               type="button"
               onClick={() => toggleExercise(ex.id, total)}
               className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all active:scale-[0.98] ${
-                isDone
-                  ? 'border-tz-gold/40 bg-tz-gold/5'
-                  : 'hover:border-tz-border/80'
+                isDone ? 'border-tz-gold/40 bg-tz-gold/5' : 'hover:border-tz-border/80'
               }`}
             >
               {/* Checkbox visual */}
               <div className={`mt-0.5 h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
-                isDone
-                  ? 'bg-tz-gold border-tz-gold'
-                  : 'border-tz-border bg-transparent'
+                isDone ? 'bg-tz-gold border-tz-gold' : 'border-tz-border bg-transparent'
               }`}>
                 {isDone && (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-tz-bg">

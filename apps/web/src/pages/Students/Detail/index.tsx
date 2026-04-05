@@ -116,6 +116,7 @@ export function StudentDetailPage() {
 
   useEffect(() => {
     if (!id) return
+
     Promise.all([
       getStudent(id),
       supabase
@@ -127,6 +128,23 @@ export function StudentDetailPage() {
       setStudent(s)
       setWorkouts((w as WorkoutWithExercises[]) ?? [])
     }).finally(() => setIsLoading(false))
+
+    // Realtime: atualiza status do treino quando aluno muda (in_progress / completed)
+    const channel = supabase
+      .channel(`student_workouts_${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'workouts',
+        filter: `student_id=eq.${id}`,
+      }, (payload) => {
+        setWorkouts(prev =>
+          prev.map(w => w.id === payload.new.id ? { ...w, ...(payload.new as any) } : w)
+        )
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [id])
 
   async function toggleStatus() {
