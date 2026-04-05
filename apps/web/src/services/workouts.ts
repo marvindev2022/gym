@@ -70,6 +70,13 @@ export async function getWorkoutByToken(token: string): Promise<WorkoutWithExerc
   return data as WorkoutWithExercises
 }
 
+export async function updateWorkoutStatus(
+  workoutId: string,
+  status: 'active' | 'in_progress' | 'completed'
+): Promise<void> {
+  await supabase.from('workouts').update({ status }).eq('id', workoutId)
+}
+
 export async function logWorkoutActivity(
   workoutId: string,
   studentId: string | null,

@@ -31,15 +31,21 @@ function WorkoutExpanded({ workout }: { workout: WorkoutWithExercises }) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span
-            className={`text-2xs px-2 py-0.5 rounded-full font-medium ${
-              (workout as any).is_active
-                ? 'bg-tz-electric/10 text-tz-electric'
-                : 'bg-tz-muted/20 text-tz-muted'
-            }`}
-          >
-            {(workout as any).is_active ? 'Ativo' : 'Inativo'}
-          </span>
+          {(() => {
+            const status = (workout as any).status ?? ((workout as any).is_active ? 'active' : 'inactive')
+            const map: Record<string, { cls: string; label: string }> = {
+              active:      { cls: 'bg-tz-electric/10 text-tz-electric', label: 'Ativo' },
+              in_progress: { cls: 'bg-tz-gold/10 text-tz-gold', label: '⏱ Em progresso' },
+              completed:   { cls: 'bg-green-500/10 text-green-400', label: '✓ Concluído' },
+              inactive:    { cls: 'bg-tz-muted/20 text-tz-muted', label: 'Inativo' },
+            }
+            const s = map[status] ?? map.inactive
+            return (
+              <span className={`text-2xs px-2 py-0.5 rounded-full font-medium ${s.cls}`}>
+                {s.label}
+              </span>
+            )
+          })()}
           <svg
             width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
             className={`text-tz-muted transition-transform ${open ? 'rotate-180' : ''}`}

@@ -1,30 +1,50 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button, Badge } from '@treinozap/ui'
-import { getWorkoutByToken, logWorkoutActivity } from '@services/workouts'
+import { Badge } from '@treinozap/ui'
+import { getWorkoutByToken, logWorkoutActivity, updateWorkoutStatus } from '@services/workouts'
 import type { WorkoutWithExercises } from '@treinozap/types'
 
 export function PublicWorkoutPage() {
   const { token } = useParams<{ token: string }>()
   const [workout, setWorkout] = useState<WorkoutWithExercises | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
   const [isCompleted, setIsCompleted] = useState(false)
-  const [isMarkingDone, setIsMarkingDone] = useState(false)
 
   useEffect(() => {
     if (!token) return
     getWorkoutByToken(token).then((w) => {
       setWorkout(w)
-      if (w) logWorkoutActivity(w.id, w.student_id ?? null, 'viewed_workout')
+      if (w) {
+        logWorkoutActivity(w.id, (w as any).student_id ?? null, 'viewed_workout')
+        // Marca in_progress assim que o aluno abre
+        if ((w as any).status === 'active') {
+          updateWorkoutStatus(w.id, 'in_progress')
+        }
+        if ((w as any).status === 'completed') {
+          setIsCompleted(true)
+        }
+      }
     }).finally(() => setIsLoading(false))
   }, [token])
 
-  async function handleComplete() {
-    if (!workout || isCompleted) return
-    setIsMarkingDone(true)
-    await logWorkoutActivity(workout.id, workout.student_id ?? null, 'completed_workout')
-    setIsCompleted(true)
-    setIsMarkingDone(false)
+  function toggleExercise(id: string, total: number) {
+    if (isCompleted) return
+    setChecked(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        // Todos marcados → completa o treino
+        if (next.size === total && workout) {
+          setIsCompleted(true)
+          updateWorkoutStatus(workout.id, 'completed')
+          logWorkoutActivity(workout.id, (workout as any).student_id ?? null, 'completed_workout')
+        }
+      }
+      return next
+    })
   }
 
   if (isLoading) {
@@ -45,7 +65,10 @@ export function PublicWorkoutPage() {
     )
   }
 
-  const sortedExercises = [...(workout.exercises ?? [])].sort((a, b) => a.order_index - b.order_index)
+  const sortedExercises = [...(workout.exercises ?? [])].sort((a, b) => (a as any).order_index - (b as any).order_index)
+  const total = sortedExercises.length
+  const doneCount = isCompleted ? total : checked.size
+  const progress = total > 0 ? (doneCount / total) * 100 : 0
 
   return (
     <div className="min-h-[100dvh] bg-tz-bg flex flex-col">
@@ -62,38 +85,78 @@ export function PublicWorkoutPage() {
           <p className="text-sm text-tz-muted mt-2">{workout.description}</p>
         )}
         <div className="flex items-center gap-3 mt-3">
-          <Badge variant="gold">{sortedExercises.length} exercícios</Badge>
-          {isCompleted && <Badge variant="active" dot>Concluído hoje!</Badge>}
+          <Badge variant="gold">{total} exercício{total !== 1 ? 's' : ''}</Badge>
+          {isCompleted
+            ? <Badge variant="active" dot>Concluído!</Badge>
+            : doneCount > 0
+              ? <Badge variant="pending" dot>{doneCount}/{total} feitos</Badge>
+              : null
+          }
         </div>
+
+        {/* Barra de progresso */}
+        <div className="mt-4 h-1.5 w-full bg-tz-surface-2 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progress}%`,
+              background: isCompleted ? 'var(--tz-gold)' : 'var(--tz-electric)',
+            }}
+          />
+        </div>
+        <p className="text-xs text-tz-muted mt-1 text-right">{Math.round(progress)}%</p>
       </div>
 
       {/* Lista de exercícios */}
-      <div className="flex-1 px-5 py-4 flex flex-col gap-3">
-        {sortedExercises.map((ex, i) => (
-          <div key={ex.id} className="tz-card">
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 shrink-0 rounded-full bg-tz-gold/10 flex items-center justify-center">
-                <span className="text-tz-gold font-bold text-sm">{i + 1}</span>
+      <div className="flex-1 px-5 py-4 flex flex-col gap-3 pb-28">
+        {sortedExercises.map((ex, i) => {
+          const isDone = isCompleted || checked.has(ex.id)
+          return (
+            <button
+              key={ex.id}
+              type="button"
+              onClick={() => toggleExercise(ex.id, total)}
+              className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all active:scale-[0.98] ${
+                isDone
+                  ? 'border-tz-gold/40 bg-tz-gold/5'
+                  : 'hover:border-tz-border/80'
+              }`}
+            >
+              {/* Checkbox visual */}
+              <div className={`mt-0.5 h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
+                isDone
+                  ? 'bg-tz-gold border-tz-gold'
+                  : 'border-tz-border bg-transparent'
+              }`}>
+                {isDone && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-tz-bg">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                )}
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-tz-white">{ex.name}</h3>
+
+              <div className="flex-1 min-w-0">
+                <h3 className={`font-semibold leading-snug transition-colors ${isDone ? 'text-tz-gold line-through decoration-tz-gold/40' : 'text-tz-white'}`}>
+                  <span className="text-tz-muted font-normal mr-1">{i + 1}.</span>
+                  {ex.name}
+                </h3>
                 <div className="flex gap-4 mt-2">
                   {ex.sets && (
                     <div>
                       <span className="text-2xs text-tz-muted uppercase tracking-wide">Séries</span>
-                      <p className="font-mono text-sm font-bold text-tz-electric mt-0.5">{ex.sets}x</p>
+                      <p className={`font-mono text-sm font-bold mt-0.5 ${isDone ? 'text-tz-muted' : 'text-tz-electric'}`}>{ex.sets}x</p>
                     </div>
                   )}
                   {ex.reps && (
                     <div>
                       <span className="text-2xs text-tz-muted uppercase tracking-wide">Reps</span>
-                      <p className="font-mono text-sm font-bold text-tz-white mt-0.5">{ex.reps}</p>
+                      <p className={`font-mono text-sm font-bold mt-0.5 ${isDone ? 'text-tz-muted' : 'text-tz-white'}`}>{ex.reps}</p>
                     </div>
                   )}
-                  {ex.rest_seconds && (
+                  {(ex as any).rest_seconds && (
                     <div>
                       <span className="text-2xs text-tz-muted uppercase tracking-wide">Descanso</span>
-                      <p className="font-mono text-sm font-bold text-tz-muted mt-0.5">{ex.rest_seconds}s</p>
+                      <p className="font-mono text-sm font-bold text-tz-muted mt-0.5">{(ex as any).rest_seconds}s</p>
                     </div>
                   )}
                 </div>
@@ -101,23 +164,23 @@ export function PublicWorkoutPage() {
                   <p className="text-xs text-tz-muted mt-2 italic">💡 {ex.notes}</p>
                 )}
               </div>
-            </div>
-          </div>
-        ))}
+            </button>
+          )
+        })}
       </div>
 
-      {/* CTA fixo */}
-      <div className="sticky bottom-0 bg-tz-bg border-t border-tz-border px-5 py-4 safe-area-bottom">
-        <Button
-          fullWidth
-          size="lg"
-          variant={isCompleted ? 'gold' : 'primary'}
-          onClick={handleComplete}
-          isLoading={isMarkingDone}
-          disabled={isCompleted}
-        >
-          {isCompleted ? '✓ Treino concluído!' : 'Marcar como concluído'}
-        </Button>
+      {/* Rodapé fixo */}
+      <div className="fixed bottom-0 left-0 right-0 bg-tz-bg border-t border-tz-border px-5 py-4">
+        {isCompleted ? (
+          <div className="flex flex-col items-center gap-1 py-1">
+            <p className="text-tz-gold font-bold text-lg">🏆 Treino concluído!</p>
+            <p className="text-xs text-tz-muted">Parabéns! Seu professor já pode ver seu progresso.</p>
+          </div>
+        ) : (
+          <p className="text-center text-sm text-tz-muted">
+            Toque em cada exercício para marcar como feito
+          </p>
+        )}
       </div>
     </div>
   )
