@@ -39,11 +39,23 @@ function usePendingRequests() {
   }
 
   async function accept(requestId: string, studentId: string, trainerId: string) {
-    // Aceita a solicitação e vincula o aluno ao trainer
-    await Promise.all([
-      supabase.from('trainer_requests').update({ status: 'accepted' }).eq('id', requestId),
-      supabase.from('students').update({ trainer_id: trainerId }).eq('id', studentId),
-    ])
+    // Atualiza student PRIMEIRO (enquanto request ainda é pending — necessário para RLS)
+    const { error: studentErr } = await supabase
+      .from('students')
+      .update({ trainer_id: trainerId })
+      .eq('id', studentId)
+
+    if (studentErr) {
+      console.error('[accept] erro ao vincular aluno:', studentErr)
+      alert('Erro ao aceitar aluno: ' + studentErr.message)
+      return
+    }
+
+    await supabase
+      .from('trainer_requests')
+      .update({ status: 'accepted' })
+      .eq('id', requestId)
+
     setRequests((prev) => prev.filter((r) => r.id !== requestId))
   }
 
