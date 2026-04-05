@@ -39,6 +39,14 @@ export function StudentDetailPage() {
 
   const whatsappUrl = `https://wa.me/${student.phone.replace(/\D/g, '')}`
   const statusVariant = student.status === 'active' ? 'active' : student.status === 'inactive' ? 'inactive' : 'blocked'
+  const [copiedLink, setCopiedLink] = useState(false)
+  const studentLink = `${window.location.origin}/aluno/${(student as any).student_token}`
+
+  async function copyStudentLink() {
+    await navigator.clipboard.writeText(studentLink)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-lg animate-fade-in">
@@ -64,7 +72,10 @@ export function StudentDetailPage() {
             </Badge>
           </div>
           {student.goal && <p className="text-sm text-tz-muted mt-1">{student.goal}</p>}
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-wrap gap-3 mt-4">
+            <Button size="sm" variant={copiedLink ? 'gold' : 'primary'} onClick={copyStudentLink}>
+              {copiedLink ? '✓ Link copiado!' : '🔗 Link do aluno'}
+            </Button>
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">

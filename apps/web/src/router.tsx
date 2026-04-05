@@ -15,6 +15,7 @@ import { StudentDetailPage } from '@pages/Students/Detail'
 import { WorkoutsListPage } from '@pages/Workouts/List'
 import { WorkoutNewPage } from '@pages/Workouts/New'
 import { PublicWorkoutPage } from '@pages/Workouts/Public'
+import { AlunoPage } from '@pages/Aluno'
 
 async function requireAuth() {
   const { data } = await supabase.auth.getSession()
@@ -60,5 +61,9 @@ export const router = createBrowserRouter([
   {
     path: '/t/:token',
     element: <PublicWorkoutPage />,
+  },
+  {
+    path: '/aluno/:token',
+    element: <AlunoPage />,
   },
 ])
