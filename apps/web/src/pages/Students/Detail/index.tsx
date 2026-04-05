@@ -5,6 +5,15 @@ import { getStudent, updateStudent } from '@services/students'
 import { supabase } from '@lib/supabase'
 import type { Student, WorkoutWithExercises } from '@treinozap/types'
 
+function MedStat({ label, value, highlight, muted }: { label: string; value: string; highlight?: boolean; muted?: boolean }) {
+  return (
+    <div>
+      <span className="text-2xs text-tz-muted uppercase tracking-wide">{label}</span>
+      <p className={`font-mono text-base font-bold mt-0.5 ${highlight ? 'text-tz-electric' : muted ? 'text-tz-muted' : 'text-tz-white'}`}>{value}</p>
+    </div>
+  )
+}
+
 function WorkoutExpanded({ workout }: { workout: WorkoutWithExercises }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -292,49 +301,28 @@ export function StudentDetailPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {(s.age || s.weight || s.height) && (
-                  <div className="flex gap-5 flex-wrap">
-                    {s.age && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Idade</span>
-                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.age} anos</p>
-                      </div>
+                  <div className="flex gap-4 flex-wrap">
+                    {s.age && <MedStat label="Idade" value={`${s.age} anos`} />}
+                    {s.weight && <MedStat label="Peso" value={`${s.weight} kg`} />}
+                    {s.height && <MedStat label="Altura" value={`${s.height} cm`} />}
+                    {s.weight && s.height && (
+                      <MedStat label="IMC" value={(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)} highlight />
                     )}
-                    {s.weight && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Peso</span>
-                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.weight} kg</p>
-                      </div>
-                    )}
-                    {s.height && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Altura</span>
-                        <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.height} cm</p>
-                      </div>
-                    )}
-                    {s.age && s.height && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">IMC</span>
-                        <p className="font-mono text-base font-bold text-tz-electric mt-0.5">
-                          {(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)}
-                        </p>
-                      </div>
-                    )}
+                    {s.goal_weight && <MedStat label="Peso objetivo" value={`${s.goal_weight} kg`} muted />}
+                  </div>
+                )}
+                {(s.body_fat || s.muscle_mass || s.waist || s.hip) && (
+                  <div className="flex gap-4 flex-wrap">
+                    {s.body_fat && <MedStat label="% Gordura" value={`${s.body_fat}%`} />}
+                    {s.muscle_mass && <MedStat label="% Músculo" value={`${s.muscle_mass}%`} highlight />}
+                    {s.waist && <MedStat label="Cintura" value={`${s.waist} cm`} />}
+                    {s.hip && <MedStat label="Quadril" value={`${s.hip} cm`} />}
                   </div>
                 )}
                 {(s.fitness_level || s.weekly_availability) && (
-                  <div className="flex gap-5 flex-wrap">
-                    {s.fitness_level && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Condicionamento</span>
-                        <p className="text-sm text-tz-white mt-0.5">{fitnessLabels[s.fitness_level] ?? s.fitness_level}</p>
-                      </div>
-                    )}
-                    {s.weekly_availability && (
-                      <div>
-                        <span className="text-2xs text-tz-muted uppercase tracking-wide">Disponibilidade</span>
-                        <p className="text-sm text-tz-white mt-0.5">{s.weekly_availability}x/semana</p>
-                      </div>
-                    )}
+                  <div className="flex gap-4 flex-wrap">
+                    {s.fitness_level && <MedStat label="Condicionamento" value={fitnessLabels[s.fitness_level] ?? s.fitness_level} />}
+                    {s.weekly_availability && <MedStat label="Disponibilidade" value={`${s.weekly_availability}x/sem`} />}
                   </div>
                 )}
                 {s.health_conditions && (

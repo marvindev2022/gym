@@ -17,6 +17,15 @@ const FITNESS_LEVELS = [
   { value: 'advanced', label: 'Avançado' },
 ]
 
+function StatItem({ label, value, highlight, muted }: { label: string; value: string; highlight?: boolean; muted?: boolean }) {
+  return (
+    <div>
+      <p className="text-2xs text-tz-muted uppercase tracking-wide">{label}</p>
+      <p className={`font-mono text-base font-bold mt-0.5 ${highlight ? 'text-tz-electric' : muted ? 'text-tz-muted' : 'text-tz-white'}`}>{value}</p>
+    </div>
+  )
+}
+
 const inputCls = 'bg-tz-surface border border-tz-border rounded-tz px-3 py-2.5 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50 w-full transition-colors'
 const textareaCls = 'bg-tz-surface border border-tz-border rounded-tz px-3 py-2.5 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50 w-full resize-none transition-colors'
 const btnPrimary = 'flex-1 py-2.5 rounded-tz text-sm font-semibold transition-all active:scale-95'
@@ -50,6 +59,11 @@ export function AlunoPage() {
   const [medAge, setMedAge] = useState('')
   const [medWeight, setMedWeight] = useState('')
   const [medHeight, setMedHeight] = useState('')
+  const [medBodyFat, setMedBodyFat] = useState('')
+  const [medMuscleMass, setMedMuscleMass] = useState('')
+  const [medWaist, setMedWaist] = useState('')
+  const [medHip, setMedHip] = useState('')
+  const [medGoalWeight, setMedGoalWeight] = useState('')
   const [medConditions, setMedConditions] = useState('')
   const [medMedications, setMedMedications] = useState('')
   const [medInjuries, setMedInjuries] = useState('')
@@ -160,6 +174,11 @@ export function AlunoPage() {
     setMedAge(s.age?.toString() ?? '')
     setMedWeight(s.weight?.toString() ?? '')
     setMedHeight(s.height?.toString() ?? '')
+    setMedBodyFat(s.body_fat?.toString() ?? '')
+    setMedMuscleMass(s.muscle_mass?.toString() ?? '')
+    setMedWaist(s.waist?.toString() ?? '')
+    setMedHip(s.hip?.toString() ?? '')
+    setMedGoalWeight(s.goal_weight?.toString() ?? '')
     setMedConditions(s.health_conditions ?? '')
     setMedMedications(s.medications ?? '')
     setMedInjuries(s.injuries ?? '')
@@ -181,6 +200,11 @@ export function AlunoPage() {
         age: medAge ? parseInt(medAge) : null,
         weight: medWeight ? parseFloat(medWeight) : null,
         height: medHeight ? parseFloat(medHeight) : null,
+        body_fat: medBodyFat ? parseFloat(medBodyFat) : null,
+        muscle_mass: medMuscleMass ? parseFloat(medMuscleMass) : null,
+        waist: medWaist ? parseFloat(medWaist) : null,
+        hip: medHip ? parseFloat(medHip) : null,
+        goal_weight: medGoalWeight ? parseFloat(medGoalWeight) : null,
         health_conditions: medConditions.trim() || null,
         medications: medMedications.trim() || null,
         injuries: medInjuries.trim() || null,
@@ -517,21 +541,54 @@ export function AlunoPage() {
 
           {isEditingMed ? (
             <form onSubmit={handleSaveMed} className="flex flex-col gap-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-tz-muted">Idade</label>
-                  <input type="number" value={medAge} onChange={(e) => setMedAge(e.target.value)} placeholder="30" min="1" max="120" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-tz-muted">Peso (kg)</label>
-                  <input type="number" value={medWeight} onChange={(e) => setMedWeight(e.target.value)} placeholder="70" step="0.1" className={inputCls} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-tz-muted">Altura (cm)</label>
-                  <input type="number" value={medHeight} onChange={(e) => setMedHeight(e.target.value)} placeholder="170" step="0.1" className={inputCls} />
+              {/* Medidas básicas */}
+              <div>
+                <p className="text-xs text-tz-muted uppercase tracking-wide mb-2">Medidas básicas</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">Idade</label>
+                    <input type="number" value={medAge} onChange={(e) => setMedAge(e.target.value)} placeholder="30" min="1" max="120" className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">Peso (kg)</label>
+                    <input type="number" value={medWeight} onChange={(e) => setMedWeight(e.target.value)} placeholder="70" step="0.1" className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">Altura (cm)</label>
+                    <input type="number" value={medHeight} onChange={(e) => setMedHeight(e.target.value)} placeholder="170" step="0.1" className={inputCls} />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* Composição corporal */}
+              <div>
+                <p className="text-xs text-tz-muted uppercase tracking-wide mb-2">Composição corporal</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">% Gordura corporal</label>
+                    <input type="number" value={medBodyFat} onChange={(e) => setMedBodyFat(e.target.value)} placeholder="20" step="0.1" min="1" max="70" className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">% Massa muscular</label>
+                    <input type="number" value={medMuscleMass} onChange={(e) => setMedMuscleMass(e.target.value)} placeholder="35" step="0.1" min="1" max="80" className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">Cintura (cm)</label>
+                    <input type="number" value={medWaist} onChange={(e) => setMedWaist(e.target.value)} placeholder="80" step="0.1" className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-tz-muted">Quadril (cm)</label>
+                    <input type="number" value={medHip} onChange={(e) => setMedHip(e.target.value)} placeholder="95" step="0.1" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Objetivo e disponibilidade */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-tz-muted">Peso objetivo (kg)</label>
+                  <input type="number" value={medGoalWeight} onChange={(e) => setMedGoalWeight(e.target.value)} placeholder="65" step="0.1" className={inputCls} />
+                </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-tz-muted">Condicionamento</label>
                   <select value={medFitnessLevel} onChange={(e) => setMedFitnessLevel(e.target.value)} className={inputCls}>
@@ -544,6 +601,8 @@ export function AlunoPage() {
                   <input type="number" value={medWeeklyAvailability} onChange={(e) => setMedWeeklyAvailability(e.target.value)} placeholder="3" min="1" max="7" className={inputCls} />
                 </div>
               </div>
+
+              {/* Saúde */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-tz-muted">Condições de saúde</label>
                 <textarea value={medConditions} onChange={(e) => setMedConditions(e.target.value)} placeholder="Ex: hipertensão, diabetes..." rows={2} className={textareaCls} />
@@ -574,42 +633,38 @@ export function AlunoPage() {
             </form>
           ) : (
             <div className="flex flex-col gap-4">
+              {/* Medidas básicas + IMC */}
               {(s.age || s.weight || s.height) && (
-                <div className="flex gap-5 flex-wrap">
-                  {s.age && (
-                    <div>
-                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Idade</p>
-                      <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.age} anos</p>
-                    </div>
+                <div className="flex gap-4 flex-wrap">
+                  {s.age && <StatItem label="Idade" value={`${s.age} anos`} />}
+                  {s.weight && <StatItem label="Peso" value={`${s.weight} kg`} />}
+                  {s.height && <StatItem label="Altura" value={`${s.height} cm`} />}
+                  {s.weight && s.height && (
+                    <StatItem
+                      label="IMC"
+                      value={(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)}
+                      highlight
+                    />
                   )}
-                  {s.weight && (
-                    <div>
-                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Peso</p>
-                      <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.weight} kg</p>
-                    </div>
-                  )}
-                  {s.height && (
-                    <div>
-                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Altura</p>
-                      <p className="font-mono text-base font-bold text-tz-white mt-0.5">{s.height} cm</p>
-                    </div>
-                  )}
+                  {s.goal_weight && <StatItem label="Peso objetivo" value={`${s.goal_weight} kg`} muted />}
                 </div>
               )}
+              {/* Composição corporal */}
+              {(s.body_fat || s.muscle_mass || s.waist || s.hip) && (
+                <div className="flex gap-4 flex-wrap">
+                  {s.body_fat && <StatItem label="% Gordura" value={`${s.body_fat}%`} />}
+                  {s.muscle_mass && <StatItem label="% Músculo" value={`${s.muscle_mass}%`} highlight />}
+                  {s.waist && <StatItem label="Cintura" value={`${s.waist} cm`} />}
+                  {s.hip && <StatItem label="Quadril" value={`${s.hip} cm`} />}
+                </div>
+              )}
+              {/* Nível + disponibilidade */}
               {(s.fitness_level || s.weekly_availability) && (
-                <div className="flex gap-5 flex-wrap">
+                <div className="flex gap-4 flex-wrap">
                   {s.fitness_level && (
-                    <div>
-                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Condicionamento</p>
-                      <p className="text-sm text-tz-white mt-0.5">{FITNESS_LEVELS.find((f) => f.value === s.fitness_level)?.label ?? s.fitness_level}</p>
-                    </div>
+                    <StatItem label="Condicionamento" value={FITNESS_LEVELS.find((f) => f.value === s.fitness_level)?.label ?? s.fitness_level} />
                   )}
-                  {s.weekly_availability && (
-                    <div>
-                      <p className="text-2xs text-tz-muted uppercase tracking-wide">Disponibilidade</p>
-                      <p className="text-sm text-tz-white mt-0.5">{s.weekly_availability}x/semana</p>
-                    </div>
-                  )}
+                  {s.weekly_availability && <StatItem label="Disponibilidade" value={`${s.weekly_availability}x/semana`} />}
                 </div>
               )}
               {s.health_conditions && (
