@@ -22,13 +22,12 @@ export function PublicWorkoutPage() {
       const status = (w as any).status ?? 'active'
 
       if (status === 'completed') {
-        // Já foi concluído antes → mostra como concluído imediatamente
         setIsCompleted(true)
-      } else if (status === 'active') {
-        // Primeira abertura → marca in_progress via Edge Function
-        updateWorkoutStatus(w.id, (w as any).public_token, 'in_progress')
+      } else {
+        // Primeira abertura ou retorno → marca in_progress
+        // token da URL == public_token do banco
+        updateWorkoutStatus(w.id, token, 'in_progress')
       }
-      // 'in_progress' → já estava em andamento, não faz nada (checkboxes zerados — normal)
     }).finally(() => setIsLoading(false))
   }, [token])
 
@@ -41,14 +40,20 @@ export function PublicWorkoutPage() {
       } else {
         next.add(id)
         if (next.size === total) {
-          // Todos marcados → completa
           setIsCompleted(true)
-          updateWorkoutStatus(workout.id, (workout as any).public_token, 'completed')
+          updateWorkoutStatus(workout.id, token!, 'completed')
           logWorkoutActivity(workout.id, (workout as any).student_id ?? null, 'completed_workout')
         }
       }
       return next
     })
+  }
+
+  function refazerTreino() {
+    if (!workout) return
+    setIsCompleted(false)
+    setChecked(new Set())
+    updateWorkoutStatus(workout.id, token!, 'in_progress')
   }
 
   if (isLoading) {
@@ -120,11 +125,11 @@ export function PublicWorkoutPage() {
               key={ex.id}
               type="button"
               onClick={() => toggleExercise(ex.id, total)}
-              className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all active:scale-[0.98] ${
-                isDone ? 'border-tz-gold/40 bg-tz-gold/5' : 'hover:border-tz-border/80'
-              }`}
+              disabled={isCompleted}
+              className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all ${
+                isCompleted ? 'opacity-70' : 'active:scale-[0.98]'
+              } ${isDone ? 'border-tz-gold/40 bg-tz-gold/5' : 'hover:border-tz-border/80'}`}
             >
-              {/* Checkbox visual */}
               <div className={`mt-0.5 h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
                 isDone ? 'bg-tz-gold border-tz-gold' : 'border-tz-border bg-transparent'
               }`}>
@@ -134,7 +139,6 @@ export function PublicWorkoutPage() {
                   </svg>
                 )}
               </div>
-
               <div className="flex-1 min-w-0">
                 <h3 className={`font-semibold leading-snug transition-colors ${isDone ? 'text-tz-gold line-through decoration-tz-gold/40' : 'text-tz-white'}`}>
                   <span className="text-tz-muted font-normal mr-1">{i + 1}.</span>
@@ -172,9 +176,17 @@ export function PublicWorkoutPage() {
       {/* Rodapé fixo */}
       <div className="fixed bottom-0 left-0 right-0 bg-tz-bg border-t border-tz-border px-5 py-4">
         {isCompleted ? (
-          <div className="flex flex-col items-center gap-1 py-1">
-            <p className="text-tz-gold font-bold text-lg">🏆 Treino concluído!</p>
-            <p className="text-xs text-tz-muted">Parabéns! Seu professor já pode ver seu progresso.</p>
+          <div className="flex flex-col items-center gap-3">
+            <div className="text-center">
+              <p className="text-tz-gold font-bold text-lg">🏆 Treino concluído!</p>
+              <p className="text-xs text-tz-muted">Seu professor já pode ver seu progresso.</p>
+            </div>
+            <button
+              onClick={refazerTreino}
+              className="text-xs text-tz-muted hover:text-tz-white underline underline-offset-2 transition-colors active:scale-95"
+            >
+              Refazer treino
+            </button>
           </div>
         ) : (
           <p className="text-center text-sm text-tz-muted">

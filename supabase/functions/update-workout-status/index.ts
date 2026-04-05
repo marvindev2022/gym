@@ -32,31 +32,33 @@ Deno.serve(async (req) => {
   )
 
   // Verifica que workout_id + public_token coincidem (segurança)
-  const { data: workout } = await supabaseAdmin
+  const { data: workout, error: fetchError } = await supabaseAdmin
     .from('workouts')
     .select('id, status')
     .eq('id', workout_id)
     .eq('public_token', public_token)
     .single()
 
-  if (!workout) {
-    return new Response(JSON.stringify({ error: 'Treino não encontrado' }), {
+  if (fetchError || !workout) {
+    return new Response(JSON.stringify({ error: 'Treino não encontrado', detail: fetchError?.message }), {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Não regride status (completed não volta pra in_progress)
-  const order = { active: 0, in_progress: 1, completed: 2 }
-  if (order[status as keyof typeof order] < order[workout.status as keyof typeof order]) {
-    return new Response(JSON.stringify({ ok: true, skipped: 'status regression' }), {
+  const { error: updateError } = await supabaseAdmin
+    .from('workouts')
+    .update({ status })
+    .eq('id', workout_id)
+
+  if (updateError) {
+    return new Response(JSON.stringify({ error: 'Erro ao atualizar', detail: updateError.message }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  await supabaseAdmin.from('workouts').update({ status }).eq('id', workout_id)
-
-  return new Response(JSON.stringify({ ok: true }), {
+  return new Response(JSON.stringify({ ok: true, status }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })
