@@ -75,11 +75,12 @@ export async function updateWorkoutStatus(
   publicToken: string,
   status: 'active' | 'in_progress' | 'completed'
 ): Promise<void> {
-  // Usa Edge Function com service role para contornar RLS
-  // (aluno pode não estar logado ao acessar via link público)
-  await supabase.functions.invoke('update-workout-status', {
-    body: { workout_id: workoutId, public_token: publicToken, status },
-  })
+  // public_token no WHERE garante que só quem tem o link pode atualizar
+  await supabase
+    .from('workouts')
+    .update({ status })
+    .eq('id', workoutId)
+    .eq('public_token', publicToken)
 }
 
 export async function logWorkoutActivity(

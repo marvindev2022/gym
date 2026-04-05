@@ -12,3 +12,12 @@ CREATE POLICY "aluno_atualiza_status_treino" ON workouts
   FOR UPDATE
   USING (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()))
   WITH CHECK (student_id IN (SELECT id FROM students WHERE user_id = auth.uid()));
+
+-- Correção: política mais simples para aluno atualizar status
+-- (a anterior dependia de auth.uid() que pode não existir no link público)
+DROP POLICY IF EXISTS "aluno_atualiza_status_treino" ON workouts;
+DROP POLICY IF EXISTS "public_update_workout_status" ON workouts;
+CREATE POLICY "public_update_workout_status" ON workouts
+  FOR UPDATE
+  USING (is_active = true)
+  WITH CHECK (is_active = true);

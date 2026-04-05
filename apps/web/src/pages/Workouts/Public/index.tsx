@@ -1,31 +1,43 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Badge } from '@treinozap/ui'
+import { supabase } from '@lib/supabase'
 import { getWorkoutByToken, logWorkoutActivity, updateWorkoutStatus } from '@services/workouts'
 import type { WorkoutWithExercises } from '@treinozap/types'
 
 export function PublicWorkoutPage() {
   const { token } = useParams<{ token: string }>()
+  const navigate = useNavigate()
   const [workout, setWorkout] = useState<WorkoutWithExercises | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [isCompleted, setIsCompleted] = useState(false)
+  const [studentToken, setStudentToken] = useState<string | null>(null)
+  const [redirecting, setRedirecting] = useState(false)
 
   useEffect(() => {
     if (!token) return
-    getWorkoutByToken(token).then((w) => {
+    getWorkoutByToken(token).then(async (w) => {
       setWorkout(w)
       if (!w) return
 
       logWorkoutActivity(w.id, (w as any).student_id ?? null, 'viewed_workout')
 
-      const status = (w as any).status ?? 'active'
+      // Busca student_token para o redirect pós-conclusão
+      const studentId = (w as any).student_id
+      if (studentId) {
+        const { data: s } = await supabase
+          .from('students')
+          .select('student_token')
+          .eq('id', studentId)
+          .single()
+        if (s?.student_token) setStudentToken(s.student_token)
+      }
 
+      const status = (w as any).status ?? 'active'
       if (status === 'completed') {
         setIsCompleted(true)
       } else {
-        // Primeira abertura ou retorno → marca in_progress
-        // token da URL == public_token do banco
         updateWorkoutStatus(w.id, token, 'in_progress')
       }
     }).finally(() => setIsLoading(false))
@@ -40,19 +52,35 @@ export function PublicWorkoutPage() {
       } else {
         next.add(id)
         if (next.size === total) {
-          setIsCompleted(true)
-          updateWorkoutStatus(workout.id, token!, 'completed')
-          logWorkoutActivity(workout.id, (workout as any).student_id ?? null, 'completed_workout')
+          handleComplete()
         }
       }
       return next
     })
   }
 
+  async function handleComplete() {
+    if (!workout) return
+    setIsCompleted(true)
+    await Promise.all([
+      updateWorkoutStatus(workout.id, token!, 'completed'),
+      logWorkoutActivity(workout.id, (workout as any).student_id ?? null, 'completed_workout'),
+    ])
+
+    // Redireciona pro portal do aluno após 3 segundos
+    setRedirecting(true)
+    setTimeout(() => {
+      if (studentToken) {
+        navigate(`/aluno/${studentToken}`)
+      }
+    }, 3000)
+  }
+
   function refazerTreino() {
     if (!workout) return
     setIsCompleted(false)
     setChecked(new Set())
+    setRedirecting(false)
     updateWorkoutStatus(workout.id, token!, 'in_progress')
   }
 
@@ -74,9 +102,64 @@ export function PublicWorkoutPage() {
     )
   }
 
+  // Tela de conclusão
+  if (isCompleted) {
+    return (
+      <div className="min-h-[100dvh] bg-tz-bg flex flex-col items-center justify-center p-6 text-center gap-6">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-7xl">🏆</span>
+          <h1 className="text-2xl font-extrabold text-tz-white">Treino concluído!</h1>
+          <p className="text-sm text-tz-muted max-w-xs">
+            Parabéns! Seu professor já está vendo seu progresso.
+          </p>
+        </div>
+
+        <div className="w-full max-w-xs flex flex-col gap-3">
+          {studentToken && (
+            <div className="flex flex-col items-center gap-1">
+              {redirecting && (
+                <p className="text-xs text-tz-muted">Redirecionando para seu portal...</p>
+              )}
+              <button
+                onClick={() => navigate(`/aluno/${studentToken}`)}
+                className="w-full py-3 rounded-tz bg-tz-gold text-tz-bg text-sm font-bold active:scale-95 transition-all hover:bg-tz-gold/90"
+              >
+                Ir para meu portal
+              </button>
+            </div>
+          )}
+          <button
+            onClick={refazerTreino}
+            className="w-full py-3 rounded-tz border border-tz-border text-tz-muted text-sm hover:text-tz-white hover:border-tz-muted active:scale-95 transition-all"
+          >
+            Refazer treino
+          </button>
+        </div>
+
+        {/* Resumo dos exercícios */}
+        <div className="w-full max-w-xs mt-2">
+          <p className="text-xs text-tz-muted mb-3 text-left uppercase tracking-wide">Exercícios realizados</p>
+          <div className="flex flex-col gap-1.5">
+            {[...(workout.exercises ?? [])].sort((a, b) => (a as any).order_index - (b as any).order_index).map((ex, i) => (
+              <div key={ex.id} className="flex items-center gap-2 text-sm">
+                <div className="h-4 w-4 shrink-0 rounded-full bg-tz-gold flex items-center justify-center">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-tz-bg">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                </div>
+                <span className="text-tz-muted">{i + 1}.</span>
+                <span className="text-tz-white font-medium">{ex.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const sortedExercises = [...(workout.exercises ?? [])].sort((a, b) => (a as any).order_index - (b as any).order_index)
   const total = sortedExercises.length
-  const doneCount = isCompleted ? total : checked.size
+  const doneCount = checked.size
   const progress = total > 0 ? (doneCount / total) * 100 : 0
 
   return (
@@ -95,40 +178,33 @@ export function PublicWorkoutPage() {
         )}
         <div className="flex items-center gap-3 mt-3">
           <Badge variant="gold">{total} exercício{total !== 1 ? 's' : ''}</Badge>
-          {isCompleted
-            ? <Badge variant="active" dot>Concluído!</Badge>
-            : doneCount > 0
-              ? <Badge variant="pending" dot>{doneCount}/{total} feitos</Badge>
-              : null
-          }
+          {doneCount > 0 && (
+            <Badge variant="pending" dot>{doneCount}/{total} feitos</Badge>
+          )}
         </div>
 
         {/* Barra de progresso */}
         <div className="mt-4 h-1.5 w-full bg-tz-surface-2 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${progress}%`,
-              background: isCompleted ? 'var(--tz-gold)' : 'var(--tz-electric)',
-            }}
+            className="h-full bg-tz-electric rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
           />
         </div>
         <p className="text-xs text-tz-muted mt-1 text-right">{Math.round(progress)}%</p>
       </div>
 
       {/* Lista de exercícios */}
-      <div className="flex-1 px-5 py-4 flex flex-col gap-3 pb-28">
+      <div className="flex-1 px-5 py-4 flex flex-col gap-3 pb-20">
         {sortedExercises.map((ex, i) => {
-          const isDone = isCompleted || checked.has(ex.id)
+          const isDone = checked.has(ex.id)
           return (
             <button
               key={ex.id}
               type="button"
               onClick={() => toggleExercise(ex.id, total)}
-              disabled={isCompleted}
-              className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all ${
-                isCompleted ? 'opacity-70' : 'active:scale-[0.98]'
-              } ${isDone ? 'border-tz-gold/40 bg-tz-gold/5' : 'hover:border-tz-border/80'}`}
+              className={`w-full text-left tz-card p-4 flex items-start gap-3 transition-all active:scale-[0.98] ${
+                isDone ? 'border-tz-gold/40 bg-tz-gold/5' : 'hover:border-tz-border/80'
+              }`}
             >
               <div className={`mt-0.5 h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
                 isDone ? 'bg-tz-gold border-tz-gold' : 'border-tz-border bg-transparent'
@@ -140,7 +216,7 @@ export function PublicWorkoutPage() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className={`font-semibold leading-snug transition-colors ${isDone ? 'text-tz-gold line-through decoration-tz-gold/40' : 'text-tz-white'}`}>
+                <h3 className={`font-semibold leading-snug ${isDone ? 'text-tz-gold line-through decoration-tz-gold/40' : 'text-tz-white'}`}>
                   <span className="text-tz-muted font-normal mr-1">{i + 1}.</span>
                   {ex.name}
                 </h3>
@@ -175,24 +251,12 @@ export function PublicWorkoutPage() {
 
       {/* Rodapé fixo */}
       <div className="fixed bottom-0 left-0 right-0 bg-tz-bg border-t border-tz-border px-5 py-4">
-        {isCompleted ? (
-          <div className="flex flex-col items-center gap-3">
-            <div className="text-center">
-              <p className="text-tz-gold font-bold text-lg">🏆 Treino concluído!</p>
-              <p className="text-xs text-tz-muted">Seu professor já pode ver seu progresso.</p>
-            </div>
-            <button
-              onClick={refazerTreino}
-              className="text-xs text-tz-muted hover:text-tz-white underline underline-offset-2 transition-colors active:scale-95"
-            >
-              Refazer treino
-            </button>
-          </div>
-        ) : (
-          <p className="text-center text-sm text-tz-muted">
-            Toque em cada exercício para marcar como feito
-          </p>
-        )}
+        <p className="text-center text-sm text-tz-muted">
+          {doneCount === 0
+            ? 'Toque em cada exercício para marcar como feito'
+            : `${total - doneCount} exercício${total - doneCount !== 1 ? 's' : ''} restante${total - doneCount !== 1 ? 's' : ''}`
+          }
+        </p>
       </div>
     </div>
   )
