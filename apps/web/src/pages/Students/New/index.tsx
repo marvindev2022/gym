@@ -37,8 +37,9 @@ export function StudentNewPage() {
         status: 'active',
       })
       navigate('/students')
-    } catch {
-      setApiError('Erro ao cadastrar aluno. Tente novamente.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : JSON.stringify(err)
+      setApiError(msg)
     }
   }
 
