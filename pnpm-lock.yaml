@@ -81,6 +81,15 @@ importers:
       vite-plugin-pwa:
         specifier: ^0.21.1
         version: 0.21.2(vite@6.4.1(@types/node@25.5.2)(jiti@1.21.7)(terser@5.46.1))(workbox-build@7.4.0)(workbox-window@7.4.0)
+      workbox-precaching:
+        specifier: ^7.4.0
+        version: 7.4.0
+      workbox-routing:
+        specifier: ^7.4.0
+        version: 7.4.0
+      workbox-strategies:
+        specifier: ^7.4.0
+        version: 7.4.0
 
   packages/config: {}
 
