@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Student } from '@treinozap/types'
 import { listStudents, createStudent, getInactiveStudents } from '@services/students'
 import type { CreateStudentFormData } from '@schemas/student'
+import { supabase } from '@lib/supabase'
 
 export function useStudents() {
   const [students, setStudents] = useState<Student[]>([])
@@ -21,11 +22,23 @@ export function useStudents() {
     }
   }, [])
 
-  useEffect(() => { fetchStudents() }, [fetchStudents])
+  useEffect(() => {
+    fetchStudents()
+
+    // Realtime: atualiza lista quando qualquer aluno muda (aceita proposta, status, etc.)
+    const channel = supabase
+      .channel('students_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'students' }, fetchStudents)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'students' }, fetchStudents)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'students' }, fetchStudents)
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchStudents])
 
   async function addStudent(data: CreateStudentFormData): Promise<Student> {
     const student = await createStudent({
-      trainer_id: '', // será preenchido pelo service
+      trainer_id: '',
       name: data.name,
       phone: data.phone,
       email: data.email || null,

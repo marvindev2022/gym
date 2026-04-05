@@ -69,14 +69,14 @@ export function AlunoPage() {
 
     load()
 
-    // Realtime: atualiza quando trainer_id ou status do aluno mudar
+    // Realtime: atualiza quando aluno mudar (proposta, status, trainer_id)
+    // Realtime: atualiza quando trainer adicionar/alterar treino
     const channel = supabase
-      .channel(`student_${token}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'students',
-      }, () => { load() })
+      .channel(`aluno_${token}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'students' }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workouts' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workouts' }, () => load())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'workouts' }, () => load())
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
