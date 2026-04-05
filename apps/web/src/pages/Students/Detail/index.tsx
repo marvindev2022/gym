@@ -37,7 +37,8 @@ export function StudentDetailPage() {
   if (isLoading) return <div className="text-center py-12 text-tz-muted">Carregando...</div>
   if (!student) return <div className="text-center py-12 text-tz-error">Aluno não encontrado</div>
 
-  const whatsappUrl = `https://wa.me/${student.phone.replace(/\D/g, '')}`
+  const rawPhone = student.phone.replace(/\D/g, '')
+  const whatsappUrl = `https://wa.me/${rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`}`
   const statusVariant = student.status === 'active' ? 'active' : student.status === 'inactive' ? 'inactive' : 'blocked'
   const [copiedLink, setCopiedLink] = useState(false)
   const studentLink = `${window.location.origin}/aluno/${(student as any).student_token}`

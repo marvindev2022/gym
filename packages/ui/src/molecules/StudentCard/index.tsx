@@ -51,7 +51,8 @@ export function StudentCard({
   onClick,
   className,
 }: StudentCardProps) {
-  const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}`
+  const rawPhone = phone.replace(/\D/g, '')
+  const whatsappUrl = `https://wa.me/${rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`}`
 
   return (
     <Card.Root
