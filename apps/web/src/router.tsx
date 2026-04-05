@@ -22,6 +22,7 @@ import { AlunoLoginPage } from '@pages/Aluno/Login'
 import { AlunoDefinirSenhaPage } from '@pages/Aluno/DefinirSenha'
 import { ConectarPersonalPage } from '@pages/ConectarPersonal'
 import { ProfessoresPage } from '@pages/Professores'
+import { PerfilPage } from '@pages/Perfil'
 
 async function requireAuth() {
   const { data } = await supabase.auth.getSession()
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
       { path: 'students/:id', element: <StudentDetailPage /> },
       { path: 'workouts', element: <WorkoutsListPage /> },
       { path: 'workouts/new', element: <WorkoutNewPage /> },
+      { path: 'perfil', element: <PerfilPage /> },
     ],
   },
   {
