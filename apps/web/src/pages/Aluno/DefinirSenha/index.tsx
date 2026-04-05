@@ -66,18 +66,28 @@ export function AlunoDefinirSenhaPage() {
       return
     }
 
-    // Busca o portal do aluno pelo email
+    // Busca o portal do aluno: primeiro por user_id, fallback por email
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.email) {
+    if (user) {
       const { data: student } = await supabase
         .from('students')
-        .select('student_token')
-        .eq('email', user.email)
+        .select('id, student_token')
+        .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+        .order('user_id', { ascending: false, nullsFirst: false })
+        .limit(1)
         .single()
 
-      if (student?.student_token) {
-        navigate(`/aluno/${student.student_token}`, { replace: true })
-        return
+      if (student) {
+        // Ativa o aluno ao confirmar o cadastro
+        await supabase
+          .from('students')
+          .update({ status: 'active', user_id: user.id })
+          .eq('id', student.id)
+
+        if (student.student_token) {
+          navigate(`/aluno/${student.student_token}`, { replace: true })
+          return
+        }
       }
     }
 

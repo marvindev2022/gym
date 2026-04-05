@@ -13,20 +13,23 @@ interface StudentCardProps {
   status: StudentStatus
   lastActivityAt: string | null
   workoutsCount?: number
+  whatsappMessage?: string
   onClick?: () => void
   className?: string
 }
 
-const statusVariantMap: Record<StudentStatus, 'active' | 'inactive' | 'blocked'> = {
+const statusVariantMap: Record<StudentStatus, 'active' | 'inactive' | 'blocked' | 'pending'> = {
   active: 'active',
   inactive: 'inactive',
   blocked: 'blocked',
+  pending: 'pending',
 }
 
 const statusLabelMap: Record<StudentStatus, string> = {
   active: 'Ativo',
   inactive: 'Inativo',
   blocked: 'Bloqueado',
+  pending: 'Aguardando',
 }
 
 function formatLastActivity(dateStr: string | null): string {
@@ -48,11 +51,15 @@ export function StudentCard({
   status,
   lastActivityAt,
   workoutsCount = 0,
+  whatsappMessage,
   onClick,
   className,
 }: StudentCardProps) {
   const rawPhone = phone.replace(/\D/g, '')
-  const whatsappUrl = `https://wa.me/${rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`}`
+  const basePhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`
+  const whatsappUrl = whatsappMessage
+    ? `https://wa.me/${basePhone}?text=${encodeURIComponent(whatsappMessage)}`
+    : `https://wa.me/${basePhone}`
 
   return (
     <Card.Root

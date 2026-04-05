@@ -32,7 +32,7 @@ export function useStudents() {
       goal: data.goal || null,
       monthly_fee: data.monthly_fee ?? null,
       payment_due_day: data.payment_due_day ?? null,
-      status: 'active',
+      status: 'pending',
     })
     setStudents((prev) => [student, ...prev])
     return student

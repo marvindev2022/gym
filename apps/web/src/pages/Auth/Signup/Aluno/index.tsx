@@ -41,7 +41,7 @@ export function SignupAlunoPage() {
         email: data.email,
         phone: '',
         goal: data.goal || null,
-        status: 'active',
+        status: 'pending',
       })
 
       if (studentError) { setApiError(studentError.message); return }

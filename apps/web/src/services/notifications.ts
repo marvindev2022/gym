@@ -43,6 +43,27 @@ export async function sendWhatsApp(phone: string, message: string): Promise<void
   }
 }
 
+export function buildActivationMessage(params: {
+  studentName: string
+  trainerName: string
+  email: string | null
+  portalUrl: string
+}): string {
+  const { studentName, trainerName, email, portalUrl } = params
+  return [
+    `Olá, *${studentName}*! 👋`,
+    ``,
+    `Sou *${trainerName}*, seu personal trainer no TreinoZap.`,
+    ``,
+    `Seu cadastro foi criado! Para ativar sua conta e acessar seus treinos, verifique seu email${email ? ` *(${email})*` : ''} e clique no link de convite que te enviei.`,
+    ``,
+    `Após ativar, seus treinos estarão disponíveis aqui:`,
+    `👉 ${portalUrl}`,
+    ``,
+    `Qualquer dúvida é só me chamar! 💪`,
+  ].join('\n')
+}
+
 export function buildWelcomeMessage(params: {
   studentName: string
   trainerName: string

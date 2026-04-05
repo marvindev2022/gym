@@ -26,11 +26,13 @@ export function AlunoLoginPage() {
       return
     }
 
-    // Busca o portal do aluno pelo email autenticado
+    // Busca o portal do aluno: primeiro por user_id (v2+), fallback por email
     const { data: student } = await supabase
       .from('students')
       .select('student_token')
-      .eq('email', data.user.email!)
+      .or(`user_id.eq.${data.user.id},email.eq.${data.user.email}`)
+      .order('user_id', { ascending: false, nullsFirst: false })
+      .limit(1)
       .single()
 
     if (student?.student_token) {

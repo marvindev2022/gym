@@ -11,6 +11,7 @@ export type Student = {
   paymentDueDay: number | null  // 1-31
   status: StudentStatus
   lastActivityAt: string | null
+  student_token: string | null
   createdAt: string
 }
 

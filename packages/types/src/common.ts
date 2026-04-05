@@ -20,6 +20,6 @@ export type ApiError = {
 
 export type Plan = 'free' | 'pro' | 'premium'
 
-export type StudentStatus = 'active' | 'inactive' | 'blocked'
+export type StudentStatus = 'active' | 'inactive' | 'blocked' | 'pending'
 
 export type WorkoutEvent = 'viewed_workout' | 'completed_workout' | 'started_workout'
