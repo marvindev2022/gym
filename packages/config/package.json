@@ -1,0 +1,11 @@
+{
+  "name": "@treinozap/config",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./eslint": "./eslint/index.js",
+    "./tsconfig": "./tsconfig/base.json",
+    "./tsconfig/react": "./tsconfig/react.json",
+    "./tailwind": "./tailwind/index.js"
+  }
+}

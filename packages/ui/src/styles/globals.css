@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --tz-bg: #0A0A0A;
+    --tz-surface: #141414;
+    --tz-surface-2: #1E1E1E;
+    --tz-border: #2A2A2A;
+    --tz-gold: #C8A96E;
+    --tz-gold-light: #E4C98A;
+    --tz-gold-dark: #A88A52;
+    --tz-electric: #D4FF3C;
+    --tz-electric-dark: #AACC00;
+    --tz-white: #F0EDE8;
+    --tz-muted: #6B6868;
+    --tz-success: #4ADE80;
+    --tz-warning: #FBBF24;
+    --tz-error: #F87171;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-tz-bg text-tz-white font-sans antialiased;
+    min-height: 100dvh;
+  }
+
+  /* Scrollbar customizada — thin e escura */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--tz-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--tz-border);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--tz-muted);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--tz-border) var(--tz-bg);
+  }
+}
+
+@layer components {
+  .tz-focus {
+    @apply outline-none ring-2 ring-tz-gold ring-offset-2 ring-offset-tz-bg;
+  }
+
+  .tz-card {
+    @apply bg-tz-surface border border-tz-border rounded-tz shadow-tz-card;
+  }
+
+  .tz-section-title {
+    @apply text-xs font-semibold tracking-widest text-tz-muted uppercase;
+  }
+}
