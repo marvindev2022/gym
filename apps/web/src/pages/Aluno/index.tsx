@@ -2,22 +2,38 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@lib/supabase'
 import { Badge, Avatar } from '@treinozap/ui'
-import { logWorkoutActivity } from '@services/workouts'
+import { useAuth } from '@contexts/auth'
 import type { Student, WorkoutWithExercises } from '@treinozap/types'
+
+const BR_STATES = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+]
 
 export function AlunoPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
+  const { session } = useAuth()
   const [student, setStudent] = useState<Student | null>(null)
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [weekCount, setWeekCount] = useState(0)
 
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editGoal, setEditGoal] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [editState, setEditState] = useState('')
+  const [editNeighborhood, setEditNeighborhood] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedOk, setSavedOk] = useState(false)
+
   useEffect(() => {
     if (!token) return
 
     async function load() {
-      // Busca aluno pelo student_token
       const { data: s } = await supabase
         .from('students')
         .select('*')
@@ -27,7 +43,6 @@ export function AlunoPage() {
       if (!s) { setIsLoading(false); return }
       setStudent(s as Student)
 
-      // Busca treinos do aluno
       const { data: w } = await supabase
         .from('workouts')
         .select('*, exercises(*)')
@@ -37,7 +52,6 @@ export function AlunoPage() {
 
       setWorkouts((w as WorkoutWithExercises[]) ?? [])
 
-      // Conta treinos concluídos esta semana
       const weekStart = new Date()
       weekStart.setDate(weekStart.getDate() - weekStart.getDay())
       weekStart.setHours(0, 0, 0, 0)
@@ -55,6 +69,45 @@ export function AlunoPage() {
 
     load()
   }, [token])
+
+  function openEdit() {
+    if (!student) return
+    setEditName(student.name)
+    setEditPhone(student.phone ?? '')
+    setEditGoal(student.goal ?? '')
+    setEditCity((student as any).city ?? '')
+    setEditState((student as any).state ?? '')
+    setEditNeighborhood((student as any).neighborhood ?? '')
+    setIsEditing(true)
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!student || !session) return
+    setIsSaving(true)
+
+    const { data: updated } = await supabase
+      .from('students')
+      .update({
+        name: editName.trim() || student.name,
+        phone: editPhone.trim() || student.phone,
+        goal: editGoal.trim() || null,
+        city: editCity.trim() || null,
+        state: editState || null,
+        neighborhood: editNeighborhood.trim() || null,
+      })
+      .eq('user_id', session.user.id)
+      .select('*')
+      .single()
+
+    setIsSaving(false)
+
+    if (updated) {
+      setStudent(updated as Student)
+      setSavedOk(true)
+      setTimeout(() => { setSavedOk(false); setIsEditing(false) }, 1500)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -74,6 +127,10 @@ export function AlunoPage() {
     )
   }
 
+  const canEdit = !!session && session.user.user_metadata?.role === 'student'
+  const location = [(student as any).neighborhood, (student as any).city, (student as any).state]
+    .filter(Boolean).join(', ')
+
   return (
     <div className="min-h-[100dvh] bg-tz-bg flex flex-col max-w-lg mx-auto">
       {/* Header */}
@@ -87,14 +144,124 @@ export function AlunoPage() {
 
         <div className="flex items-center gap-4">
           <Avatar name={student.name} size="lg" />
-          <div>
-            <h1 className="text-xl font-bold text-tz-white">{student.name}</h1>
-            {student.goal && (
-              <p className="text-sm text-tz-muted mt-0.5">{student.goal}</p>
-            )}
+          <div className="flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h1 className="text-xl font-bold text-tz-white">{student.name}</h1>
+                {student.goal && (
+                  <p className="text-sm text-tz-muted mt-0.5">{student.goal}</p>
+                )}
+                {location && (
+                  <p className="text-xs text-tz-muted/70 mt-0.5 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    {location}
+                  </p>
+                )}
+              </div>
+              {canEdit && !isEditing && (
+                <button
+                  onClick={openEdit}
+                  className="text-tz-muted hover:text-tz-white transition-colors shrink-0 mt-0.5"
+                  title="Editar perfil"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
             <Badge variant="active" dot className="mt-2">Ativo</Badge>
           </div>
         </div>
+
+        {/* Form edição */}
+        {isEditing && (
+          <form onSubmit={handleSave} className="mt-5 flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Nome</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Telefone</label>
+                <input
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="5511999999999"
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Objetivo</label>
+                <input
+                  value={editGoal}
+                  onChange={(e) => setEditGoal(e.target.value)}
+                  placeholder="Ex: emagrecer"
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Cidade</label>
+                <input
+                  value={editCity}
+                  onChange={(e) => setEditCity(e.target.value)}
+                  placeholder="São Paulo"
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Estado</label>
+                <select
+                  value={editState}
+                  onChange={(e) => setEditState(e.target.value)}
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white focus:outline-none focus:border-tz-gold/50"
+                >
+                  <option value="">UF</option>
+                  {BR_STATES.map((uf) => (
+                    <option key={uf} value={uf}>{uf}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2 flex flex-col gap-1">
+                <label className="text-xs text-tz-muted">Bairro</label>
+                <input
+                  value={editNeighborhood}
+                  onChange={(e) => setEditNeighborhood(e.target.value)}
+                  placeholder="Vila Madalena"
+                  className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className={`flex-1 py-2 rounded-tz text-sm font-semibold transition-colors ${
+                  savedOk
+                    ? 'bg-tz-gold text-tz-bg'
+                    : 'bg-tz-electric/10 text-tz-electric hover:bg-tz-electric/20'
+                }`}
+              >
+                {savedOk ? '✓ Salvo!' : isSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 rounded-tz text-sm text-tz-muted hover:text-tz-white transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Stat semanal */}
         <div className="mt-5 rounded-tz bg-tz-surface-2 border border-tz-border px-4 py-3 flex items-center gap-3">

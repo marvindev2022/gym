@@ -12,6 +12,9 @@ export type Student = {
   status: StudentStatus
   lastActivityAt: string | null
   student_token: string | null
+  city: string | null
+  state: string | null
+  neighborhood: string | null
   createdAt: string
 }
 
@@ -21,7 +24,7 @@ export type StudentCreate = Omit<Student, 'id' | 'createdAt' | 'lastActivityAt'>
 
 export type StudentUpdate = Partial<Pick<
   Student,
-  'name' | 'phone' | 'email' | 'goal' | 'monthlyFee' | 'paymentDueDay' | 'status'
+  'name' | 'phone' | 'email' | 'goal' | 'monthlyFee' | 'paymentDueDay' | 'status' | 'city' | 'state' | 'neighborhood'
 >>
 
 export type StudentWithWorkouts = Student & {

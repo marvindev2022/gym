@@ -7,11 +7,24 @@ const SPECIALTY_OPTIONS = [
   'Pilates', 'Yoga', 'Corrida', 'Crossfit', 'Reabilitação', 'Idosos', 'Natação',
 ]
 
+const BR_STATES = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
+  'MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+]
+
+type AttendanceMode = 'online' | 'presencial' | 'ambos'
+
 export function PerfilPage() {
   const [trainerId, setTrainerId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [bio, setBio] = useState('')
   const [specialty, setSpecialty] = useState<string[]>([])
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
+  const [neighborhood, setNeighborhood] = useState('')
+  const [attendanceMode, setAttendanceMode] = useState<AttendanceMode>('ambos')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -24,15 +37,21 @@ export function PerfilPage() {
 
       const { data } = await supabase
         .from('trainers')
-        .select('id, code, bio, specialty')
+        .select('id, name, phone, code, bio, specialty, city, state, neighborhood, attendance_mode')
         .eq('user_id', user.id)
         .single()
 
       if (data) {
         setTrainerId(data.id)
+        setName(data.name ?? '')
+        setPhone(data.phone ?? '')
         setCode(data.code ?? '')
         setBio(data.bio ?? '')
         setSpecialty(data.specialty ?? [])
+        setCity(data.city ?? '')
+        setState(data.state ?? '')
+        setNeighborhood(data.neighborhood ?? '')
+        setAttendanceMode((data.attendance_mode as AttendanceMode) ?? 'ambos')
       }
       setIsLoading(false)
     }
@@ -40,7 +59,6 @@ export function PerfilPage() {
   }, [])
 
   function handleCodeChange(value: string) {
-    // Só letras minúsculas, números e hífen
     setCode(value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
   }
 
@@ -59,9 +77,15 @@ export function PerfilPage() {
     const { error: err } = await supabase
       .from('trainers')
       .update({
+        name: name.trim() || undefined,
+        phone: phone.trim() || null,
         code: code.trim() || null,
         bio: bio.trim() || null,
         specialty: specialty.length ? specialty : null,
+        city: city.trim() || null,
+        state: state || null,
+        neighborhood: neighborhood.trim() || null,
+        attendance_mode: attendanceMode,
       })
       .eq('id', trainerId)
 
@@ -100,27 +124,98 @@ export function PerfilPage() {
       </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-5">
-        {/* Código */}
+        {/* Dados básicos */}
         <div className="tz-card flex flex-col gap-4">
-          <div>
-            <h2 className="tz-section-title mb-3">Código de acesso</h2>
-            <Input
-              label="Seu código"
-              placeholder="Ex: joaosilvafit"
-              value={code}
-              onChange={(e) => handleCodeChange(e.target.value)}
-              hint="Apenas letras minúsculas, números e hífen. Alunos usam este código para te encontrar."
-            />
-          </div>
+          <h2 className="tz-section-title">Dados básicos</h2>
+          <Input
+            label="Nome"
+            placeholder="Seu nome completo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Input
+            label="Telefone (WhatsApp)"
+            placeholder="5511999999999"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
 
+        {/* Localização */}
+        <div className="tz-card flex flex-col gap-4">
+          <h2 className="tz-section-title">Localização</h2>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <Input
+                label="Cidade"
+                placeholder="São Paulo"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-tz-muted">Estado</label>
+              <select
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2.5 text-sm text-tz-white focus:outline-none focus:border-tz-gold/50 transition-colors"
+              >
+                <option value="">UF</option>
+                {BR_STATES.map((uf) => (
+                  <option key={uf} value={uf}>{uf}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <Input
+            label="Bairro"
+            placeholder="Vila Madalena"
+            value={neighborhood}
+            onChange={(e) => setNeighborhood(e.target.value)}
+          />
+
+          {/* Modo de atendimento */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-tz-muted">Modo de atendimento</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: 'online', label: 'Online' },
+                { value: 'presencial', label: 'Presencial' },
+                { value: 'ambos', label: 'Ambos' },
+              ] as { value: AttendanceMode; label: string }[]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAttendanceMode(opt.value)}
+                  className={`py-2 rounded-tz text-xs font-medium border transition-colors ${
+                    attendanceMode === opt.value
+                      ? 'bg-tz-gold/15 border-tz-gold/40 text-tz-gold'
+                      : 'border-tz-border text-tz-muted hover:border-tz-gold/30 hover:text-tz-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Código de acesso */}
+        <div className="tz-card flex flex-col gap-4">
+          <h2 className="tz-section-title">Código de acesso</h2>
+          <Input
+            label="Seu código"
+            placeholder="Ex: joaosilvafit"
+            value={code}
+            onChange={(e) => handleCodeChange(e.target.value)}
+            hint="Apenas letras minúsculas, números e hífen. Alunos usam este código para te encontrar."
+          />
           {shareUrl && (
             <div className="bg-tz-surface-2 rounded-tz-sm px-3 py-2.5 flex items-center justify-between gap-3">
               <p className="text-xs text-tz-muted truncate flex-1">{shareUrl}</p>
               <button
                 type="button"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(shareUrl)
-                }}
+                onClick={async () => { await navigator.clipboard.writeText(shareUrl) }}
                 className="text-xs text-tz-gold hover:text-tz-gold/80 shrink-0 transition-colors"
               >
                 Copiar

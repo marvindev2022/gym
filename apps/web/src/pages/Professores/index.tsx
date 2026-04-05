@@ -9,6 +9,16 @@ type TrainerPublic = {
   bio: string | null
   specialty: string[] | null
   code: string
+  city: string | null
+  state: string | null
+  neighborhood: string | null
+  attendance_mode: string | null
+}
+
+const attendanceLabel: Record<string, string> = {
+  online: 'Online',
+  presencial: 'Presencial',
+  ambos: 'Online + Presencial',
 }
 
 export function ProfessoresPage() {
@@ -19,7 +29,7 @@ export function ProfessoresPage() {
   useEffect(() => {
     supabase
       .from('trainers')
-      .select('id, name, bio, specialty, code')
+      .select('id, name, bio, specialty, code, city, state, neighborhood, attendance_mode')
       .not('code', 'is', null)
       .order('name')
       .then(({ data }) => {
@@ -66,43 +76,66 @@ export function ProfessoresPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {trainers.map((trainer) => (
-              <div key={trainer.id} className="tz-card flex items-start gap-4">
-                {/* Avatar */}
-                <div className="h-12 w-12 rounded-full bg-tz-gold/10 border border-tz-gold/20 flex items-center justify-center shrink-0">
-                  <span className="text-lg font-bold text-tz-gold">
-                    {trainer.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+            {trainers.map((trainer) => {
+              const location = [trainer.neighborhood, trainer.city, trainer.state]
+                .filter(Boolean).join(', ')
+              const mode = trainer.attendance_mode ? attendanceLabel[trainer.attendance_mode] : null
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-tz-white">{trainer.name}</p>
-                  {trainer.bio && (
-                    <p className="text-xs text-tz-muted mt-0.5 line-clamp-2">{trainer.bio}</p>
-                  )}
-                  {trainer.specialty?.length ? (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {trainer.specialty.map((s) => (
-                        <span
-                          key={s}
-                          className="text-2xs px-2 py-0.5 rounded-full bg-tz-electric/10 text-tz-electric"
-                        >
-                          {s}
-                        </span>
-                      ))}
+              return (
+                <div key={trainer.id} className="tz-card flex items-start gap-4">
+                  {/* Avatar */}
+                  <div className="h-12 w-12 rounded-full bg-tz-gold/10 border border-tz-gold/20 flex items-center justify-center shrink-0">
+                    <span className="text-lg font-bold text-tz-gold">
+                      {trainer.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-tz-white">{trainer.name}</p>
+
+                    {/* Localização + modo */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                      {location && (
+                        <p className="text-xs text-tz-muted flex items-center gap-1">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                          </svg>
+                          {location}
+                        </p>
+                      )}
+                      {mode && (
+                        <p className="text-xs text-tz-muted/70">{mode}</p>
+                      )}
                     </div>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => navigate(`/conectar-personal?code=${trainer.code}`)}
-                  >
-                    Solicitar este professor
-                  </Button>
+
+                    {trainer.bio && (
+                      <p className="text-xs text-tz-muted mt-1.5 line-clamp-2">{trainer.bio}</p>
+                    )}
+                    {trainer.specialty?.length ? (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {trainer.specialty.map((s) => (
+                          <span
+                            key={s}
+                            className="text-2xs px-2 py-0.5 rounded-full bg-tz-electric/10 text-tz-electric"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => navigate(`/conectar-personal?code=${trainer.code}`)}
+                    >
+                      Solicitar este professor
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
