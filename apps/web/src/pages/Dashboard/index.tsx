@@ -14,6 +14,7 @@ type PendingRequest = {
 function usePendingRequests() {
   const [requests, setRequests] = useState<PendingRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [trainerId, setTrainerId] = useState<string | null>(null)
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -26,6 +27,7 @@ function usePendingRequests() {
       .single()
 
     if (!trainer) return
+    setTrainerId(trainer.id)
 
     const { data } = await supabase
       .from('trainer_requests')
@@ -38,17 +40,27 @@ function usePendingRequests() {
     setIsLoading(false)
   }
 
-  async function accept(requestId: string, studentId: string, trainerId: string) {
-    // Atualiza student PRIMEIRO (enquanto request ainda é pending — necessário para RLS)
-    const { error: studentErr } = await supabase
+  async function proposeContract(
+    requestId: string,
+    studentId: string,
+    proposal: { monthly_fee: number | null; payment_due_day: number | null; proposal_message: string }
+  ) {
+    if (!trainerId) return false
+
+    const { error } = await supabase
       .from('students')
-      .update({ trainer_id: trainerId })
+      .update({
+        trainer_id: trainerId,
+        monthly_fee: proposal.monthly_fee,
+        payment_due_day: proposal.payment_due_day,
+        proposal_message: proposal.proposal_message || null,
+        status: 'awaiting_approval',
+      })
       .eq('id', studentId)
 
-    if (studentErr) {
-      console.error('[accept] erro ao vincular aluno:', studentErr)
-      alert('Erro ao aceitar aluno: ' + studentErr.message)
-      return
+    if (error) {
+      alert('Erro ao enviar proposta: ' + error.message)
+      return false
     }
 
     await supabase
@@ -57,6 +69,7 @@ function usePendingRequests() {
       .eq('id', requestId)
 
     setRequests((prev) => prev.filter((r) => r.id !== requestId))
+    return true
   }
 
   async function reject(requestId: string) {
@@ -67,32 +80,51 @@ function usePendingRequests() {
   useEffect(() => {
     load()
 
-    // Real-time: atualiza quando chega nova solicitação
     const channel = supabase
       .channel('trainer_requests_notify')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'trainer_requests',
-      }, () => { load() })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trainer_requests' }, () => load())
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  return { requests, isLoading, accept, reject }
+  return { requests, isLoading, trainerId, proposeContract, reject }
 }
 
 export function DashboardPage() {
   const { students, isLoading } = useStudents()
   const { students: inactive } = useInactiveStudents(7)
-  const { requests, accept, reject } = usePendingRequests()
+  const { requests, proposeContract, reject } = usePendingRequests()
   const navigate = useNavigate()
+
+  const [proposingId, setProposingId] = useState<string | null>(null)
+  const [fee, setFee] = useState('')
+  const [dueDay, setDueDay] = useState('')
+  const [proposalMsg, setProposalMsg] = useState('')
+  const [isSending, setIsSending] = useState(false)
 
   const activeCount = students.filter((s) => s.status === 'active').length
   const estimatedRevenue = students
     .filter((s) => s.status === 'active' && s.monthly_fee)
     .reduce((acc, s) => acc + (s.monthly_fee ?? 0), 0)
+
+  function openProposal(reqId: string) {
+    setProposingId(reqId)
+    setFee('')
+    setDueDay('')
+    setProposalMsg('')
+  }
+
+  async function handleSendProposal(req: PendingRequest) {
+    setIsSending(true)
+    await proposeContract(req.id, req.students.id, {
+      monthly_fee: fee ? parseFloat(fee.replace(',', '.')) : null,
+      payment_due_day: dueDay ? parseInt(dueDay) : null,
+      proposal_message: proposalMsg,
+    })
+    setIsSending(false)
+    setProposingId(null)
+  }
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
@@ -112,36 +144,20 @@ export function DashboardPage() {
         <MetricCard
           title="Total de alunos"
           value={isLoading ? '—' : students.length}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-            </svg>
-          }
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>}
           variant="gold"
         />
         <MetricCard
           title="Ativos"
           value={isLoading ? '—' : activeCount}
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          }
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>}
           variant="electric"
         />
         <MetricCard
           title="Inativos 7d"
           value={inactive.length}
           subtitle="precisam de atenção"
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          }
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
           variant={inactive.length > 0 ? 'danger' : 'default'}
         />
         <MetricCard
@@ -149,16 +165,11 @@ export function DashboardPage() {
           value={`R$${estimatedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}
           subtitle="estimada (ativos)"
           variant="gold"
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="1" x2="12" y2="23"/>
-              <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-            </svg>
-          }
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}
         />
       </div>
 
-      {/* Solicitações pendentes de alunos */}
+      {/* Solicitações pendentes */}
       {requests.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -169,35 +180,82 @@ export function DashboardPage() {
           </div>
           <div className="flex flex-col gap-2">
             {requests.map((req) => (
-              <div key={req.id} className="tz-card flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-tz-electric/10 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-bold text-tz-electric">
-                    {req.students.name.charAt(0).toUpperCase()}
-                  </span>
+              <div key={req.id} className="tz-card flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-tz-electric/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-bold text-tz-electric">
+                      {req.students.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-tz-white">{req.students.name}</p>
+                    {req.students.goal && (
+                      <p className="text-xs text-tz-muted truncate">Objetivo: {req.students.goal}</p>
+                    )}
+                    {req.message && (
+                      <p className="text-xs text-tz-muted mt-1 italic">"{req.message}"</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-tz-white">{req.students.name}</p>
-                  {req.students.goal && (
-                    <p className="text-xs text-tz-muted truncate">Objetivo: {req.students.goal}</p>
-                  )}
-                  {req.message && (
-                    <p className="text-xs text-tz-muted mt-1 italic">"{req.message}"</p>
-                  )}
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        const { data: trainer } = await supabase.from('trainers').select('id').eq('user_id', (await supabase.auth.getUser()).data.user!.id).single()
-                        accept(req.id, req.students.id, trainer!.id)
-                      }}
-                    >
-                      Aceitar
+
+                {/* Formulário de proposta inline */}
+                {proposingId === req.id ? (
+                  <div className="flex flex-col gap-3 border-t border-tz-border pt-3">
+                    <p className="text-xs font-medium text-tz-gold">Proposta de contrato para {req.students.name}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-tz-muted">Mensalidade (R$)</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="150,00"
+                          value={fee}
+                          onChange={(e) => setFee(e.target.value)}
+                          className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-tz-muted">Vencimento (dia)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="31"
+                          placeholder="10"
+                          value={dueDay}
+                          onChange={(e) => setDueDay(e.target.value)}
+                          className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted focus:outline-none focus:border-tz-gold/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-tz-muted">Mensagem (opcional)</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ex: Plano mensal com 3 treinos/semana..."
+                        value={proposalMsg}
+                        onChange={(e) => setProposalMsg(e.target.value)}
+                        className="bg-tz-surface border border-tz-border rounded-tz px-3 py-2 text-sm text-tz-white placeholder-tz-muted resize-none focus:outline-none focus:border-tz-gold/50"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" fullWidth isLoading={isSending} onClick={() => handleSendProposal(req)}>
+                        Enviar proposta
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setProposingId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={() => openProposal(req.id)}>
+                      Aceitar e propor valores
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => reject(req.id)}>
                       Recusar
                     </Button>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -209,18 +267,11 @@ export function DashboardPage() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="tz-section-title">Alunos inativos há +7 dias</h2>
-            <Link to="/students" className="text-xs text-tz-gold hover:text-tz-gold-light transition-colors">
-              Ver todos
-            </Link>
+            <Link to="/students" className="text-xs text-tz-gold hover:text-tz-gold-light transition-colors">Ver todos</Link>
           </div>
           <div className="flex flex-col gap-2">
             {inactive.slice(0, 3).map((student) => (
-              <StudentCard
-                key={student.id}
-                {...student}
-                lastActivityAt={student.last_activity_at}
-                onClick={() => navigate(`/students/${student.id}`)}
-              />
+              <StudentCard key={student.id} {...student} lastActivityAt={student.last_activity_at} onClick={() => navigate(`/students/${student.id}`)} />
             ))}
           </div>
         </section>
@@ -230,9 +281,7 @@ export function DashboardPage() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="tz-section-title">Alunos recentes</h2>
-          <Link to="/students" className="text-xs text-tz-gold hover:text-tz-gold-light transition-colors">
-            Ver todos
-          </Link>
+          <Link to="/students" className="text-xs text-tz-gold hover:text-tz-gold-light transition-colors">Ver todos</Link>
         </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-12 text-tz-muted text-sm">Carregando...</div>
@@ -248,12 +297,7 @@ export function DashboardPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {students.slice(0, 5).map((student) => (
-              <StudentCard
-                key={student.id}
-                {...student}
-                lastActivityAt={student.last_activity_at}
-                onClick={() => navigate(`/students/${student.id}`)}
-              />
+              <StudentCard key={student.id} {...student} lastActivityAt={student.last_activity_at} onClick={() => navigate(`/students/${student.id}`)} />
             ))}
           </div>
         )}

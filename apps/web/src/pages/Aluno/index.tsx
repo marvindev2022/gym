@@ -143,6 +143,22 @@ export function AlunoPage() {
   const location = [(student as any).neighborhood, (student as any).city, (student as any).state]
     .filter(Boolean).join(', ')
 
+  async function approveContract() {
+    await supabase
+      .from('students')
+      .update({ status: 'active' })
+      .eq('student_token', token)
+    setStudent((prev) => prev ? { ...prev, status: 'active' } as any : prev)
+  }
+
+  async function declineContract() {
+    await supabase
+      .from('students')
+      .update({ status: 'pending', trainer_id: null, monthly_fee: null, payment_due_day: null, proposal_message: null })
+      .eq('student_token', token)
+    setStudent((prev) => prev ? { ...prev, status: 'pending', trainer_id: null } as any : prev)
+  }
+
   return (
     <div className="min-h-[100dvh] bg-tz-bg flex flex-col max-w-lg mx-auto">
       {/* Header */}
@@ -284,6 +300,59 @@ export function AlunoPage() {
           </div>
         </div>
       </div>
+
+      {/* Proposta de contrato aguardando aprovação */}
+      {student.status === 'awaiting_approval' && (
+        <div className="px-5 pt-5">
+          <div className="tz-card border-tz-gold/40 bg-tz-gold/5 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">📋</span>
+              <div>
+                <p className="font-semibold text-tz-white">Proposta do seu professor</p>
+                <p className="text-xs text-tz-muted mt-0.5">Revise os valores e aceite para começar</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              {(student as any).monthly_fee && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide">Mensalidade</p>
+                  <p className="font-mono text-xl font-bold text-tz-gold mt-0.5">
+                    R${(student as any).monthly_fee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
+              {(student as any).payment_due_day && (
+                <div>
+                  <p className="text-2xs text-tz-muted uppercase tracking-wide">Vence dia</p>
+                  <p className="font-mono text-xl font-bold text-tz-white mt-0.5">{(student as any).payment_due_day}</p>
+                </div>
+              )}
+            </div>
+
+            {(student as any).proposal_message && (
+              <p className="text-xs text-tz-muted italic border-l-2 border-tz-gold/30 pl-3">
+                "{(student as any).proposal_message}"
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={approveContract}
+                className="flex-1 bg-tz-gold text-tz-bg font-semibold text-sm rounded-tz py-2.5 hover:bg-tz-gold/90 transition-colors"
+              >
+                Aceitar proposta ✓
+              </button>
+              <button
+                onClick={declineContract}
+                className="px-4 py-2.5 rounded-tz text-sm text-tz-muted border border-tz-border hover:text-tz-error hover:border-tz-error/30 transition-colors"
+              >
+                Recusar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CTA sem professor */}
       {!(student as any).trainer_id && (
