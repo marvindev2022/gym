@@ -8,6 +8,8 @@ import { AppLayout } from '@pages/Layout/AppLayout'
 import { LandingPage } from '@pages/Landing'
 import { LoginPage } from '@pages/Auth/Login'
 import { SignupPage } from '@pages/Auth/Signup'
+import { SignupTrainerPage } from '@pages/Auth/Signup/Trainer'
+import { SignupAlunoPage } from '@pages/Auth/Signup/Aluno'
 import { DashboardPage } from '@pages/Dashboard'
 import { StudentsListPage } from '@pages/Students/List'
 import { StudentNewPage } from '@pages/Students/New'
@@ -16,6 +18,9 @@ import { WorkoutsListPage } from '@pages/Workouts/List'
 import { WorkoutNewPage } from '@pages/Workouts/New'
 import { PublicWorkoutPage } from '@pages/Workouts/Public'
 import { AlunoPage } from '@pages/Aluno'
+import { AlunoLoginPage } from '@pages/Aluno/Login'
+import { AlunoDefinirSenhaPage } from '@pages/Aluno/DefinirSenha'
+import { ConectarPersonalPage } from '@pages/ConectarPersonal'
 
 async function requireAuth() {
   const { data } = await supabase.auth.getSession()
@@ -25,8 +30,18 @@ async function requireAuth() {
 
 async function redirectIfAuth() {
   const { data } = await supabase.auth.getSession()
-  if (data.session) throw redirect('/dashboard')
-  return null
+  if (!data.session) return null
+  // Redireciona baseado no role
+  const role = data.session.user.user_metadata?.role
+  if (role === 'student') {
+    const { data: student } = await supabase
+      .from('students')
+      .select('student_token')
+      .eq('user_id', data.session.user.id)
+      .single()
+    throw redirect(student?.student_token ? `/aluno/${student.student_token}` : '/conectar-personal')
+  }
+  throw redirect('/dashboard')
 }
 
 export const router = createBrowserRouter([
@@ -46,6 +61,16 @@ export const router = createBrowserRouter([
     loader: redirectIfAuth,
   },
   {
+    path: '/signup/personal',
+    element: <SignupTrainerPage />,
+    loader: redirectIfAuth,
+  },
+  {
+    path: '/signup/aluno',
+    element: <SignupAlunoPage />,
+    loader: redirectIfAuth,
+  },
+  {
     path: '/',
     element: <AppLayout />,
     loader: requireAuth,
@@ -59,8 +84,20 @@ export const router = createBrowserRouter([
     ],
   },
   {
+    path: '/conectar-personal',
+    element: <ConectarPersonalPage />,
+  },
+  {
     path: '/t/:token',
     element: <PublicWorkoutPage />,
+  },
+  {
+    path: '/aluno/login',
+    element: <AlunoLoginPage />,
+  },
+  {
+    path: '/aluno/definir-senha',
+    element: <AlunoDefinirSenhaPage />,
   },
   {
     path: '/aluno/:token',

@@ -1,9 +1,103 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Avatar, Badge, Button, WorkoutCard } from '@treinozap/ui'
+import { Avatar, Badge, Button } from '@treinozap/ui'
 import { getStudent, updateStudent } from '@services/students'
 import { supabase } from '@lib/supabase'
 import type { Student, WorkoutWithExercises } from '@treinozap/types'
+
+function WorkoutExpanded({ workout }: { workout: WorkoutWithExercises }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const publicUrl = `${window.location.origin}/t/${(workout as any).public_token}`
+
+  async function copyLink(e: React.MouseEvent) {
+    e.stopPropagation()
+    await navigator.clipboard.writeText(publicUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="tz-card p-0 overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-white/5 transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-tz-white truncate">{workout.title}</p>
+          <p className="text-xs text-tz-muted mt-0.5">
+            {workout.exercises.length} exercício{workout.exercises.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`text-2xs px-2 py-0.5 rounded-full font-medium ${
+              (workout as any).is_active
+                ? 'bg-tz-electric/10 text-tz-electric'
+                : 'bg-tz-muted/20 text-tz-muted'
+            }`}
+          >
+            {(workout as any).is_active ? 'Ativo' : 'Inativo'}
+          </span>
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            className={`text-tz-muted transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-white/5">
+          {workout.exercises.length === 0 ? (
+            <p className="text-sm text-tz-muted text-center py-4">Nenhum exercício</p>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {workout.exercises.map((ex, i) => (
+                <div key={ex.id} className="flex items-start gap-3 px-4 py-3">
+                  <span className="text-2xs font-mono text-tz-muted w-5 shrink-0 pt-0.5">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-tz-white">{ex.name}</p>
+                    <div className="flex flex-wrap gap-3 mt-1">
+                      {ex.sets && (
+                        <span className="text-2xs text-tz-muted">
+                          <span className="text-tz-white font-mono">{ex.sets}</span> séries
+                        </span>
+                      )}
+                      {ex.reps && (
+                        <span className="text-2xs text-tz-muted">
+                          <span className="text-tz-white font-mono">{ex.reps}</span> reps
+                        </span>
+                      )}
+                      {ex.restSeconds && (
+                        <span className="text-2xs text-tz-muted">
+                          <span className="text-tz-white font-mono">{ex.restSeconds}s</span> descanso
+                        </span>
+                      )}
+                    </div>
+                    {ex.notes && (
+                      <p className="text-2xs text-tz-muted/70 mt-1 italic">{ex.notes}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 p-3 border-t border-white/5">
+            <Button size="sm" variant={copied ? 'gold' : 'ghost'} onClick={copyLink}>
+              {copied ? '✓ Copiado' : '🔗 Link do treino'}
+            </Button>
+            <Link to={`/workouts/new?studentId=${(workout as any).student_id}&copyFrom=${workout.id}`}>
+              <Button size="sm" variant="ghost">Duplicar</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -118,26 +212,23 @@ export function StudentDetailPage() {
       {/* Treinos */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="tz-section-title">Treinos</h2>
+          <h2 className="tz-section-title">Treinos ({workouts.length})</h2>
           <Link to={`/workouts/new?studentId=${student.id}`}>
             <Button size="sm" variant="ghost">+ Criar treino</Button>
           </Link>
         </div>
         {workouts.length === 0 ? (
-          <div className="tz-card text-center py-8">
+          <div className="tz-card text-center py-8 flex flex-col items-center gap-3">
+            <span className="text-3xl">💪</span>
             <p className="text-sm text-tz-muted">Nenhum treino criado ainda</p>
+            <Link to={`/workouts/new?studentId=${student.id}`}>
+              <Button size="sm">+ Criar primeiro treino</Button>
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
             {workouts.map((w) => (
-              <WorkoutCard
-                key={w.id}
-                {...w}
-                publicToken={w.public_token}
-                exercisesCount={w.exercises?.length ?? 0}
-                isActive={w.is_active}
-                createdAt={w.created_at}
-              />
+              <WorkoutExpanded key={w.id} workout={w} />
             ))}
           </div>
         )}

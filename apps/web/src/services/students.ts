@@ -1,5 +1,6 @@
 import { supabase } from '@lib/supabase'
 import type { Student, StudentCreate, StudentUpdate } from '@treinozap/types'
+import { sendWhatsApp, buildWelcomeMessage } from './notifications'
 
 async function getTrainerId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,6 +30,13 @@ export async function listStudents(): Promise<Student[]> {
 
 export async function createStudent(payload: StudentCreate): Promise<Student> {
   const trainerId = await getTrainerId()
+
+  const { data: trainerRow } = await supabase
+    .from('trainers')
+    .select('name')
+    .eq('id', trainerId)
+    .single()
+
   const { data, error } = await supabase
     .from('students')
     .insert({ ...payload, trainer_id: trainerId })
@@ -36,7 +44,38 @@ export async function createStudent(payload: StudentCreate): Promise<Student> {
     .single()
 
   if (error) throw error
-  return data as Student
+
+  const student = data as Student
+  const studentToken = (student as any).student_token
+  const portalUrl = studentToken
+    ? `${window.location.origin}/aluno/${studentToken}`
+    : window.location.origin
+
+  // Envia convite por email (define senha) se o aluno tiver email
+  if (student.email) {
+    const { data: { session } } = await supabase.auth.getSession()
+    supabase.functions.invoke('invite-student', {
+      body: {
+        email: student.email,
+        studentName: student.name,
+        appUrl: window.location.origin,
+      },
+      headers: session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : undefined,
+    }).catch(() => {})
+  }
+
+  // Envia WhatsApp de boas-vindas
+  const trainerName = trainerRow?.name ?? 'seu personal'
+  const message = buildWelcomeMessage({
+    studentName: student.name,
+    trainerName,
+    portalUrl,
+  })
+  sendWhatsApp(student.phone, message).catch(() => {})
+
+  return student
 }
 
 export async function getStudent(id: string): Promise<Student> {

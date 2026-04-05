@@ -157,10 +157,13 @@ export function AlunoPage() {
         )}
       </div>
 
-      <div className="px-5 pb-6 text-center">
+      <div className="px-5 pb-6 text-center flex flex-col gap-2">
         <p className="text-xs text-tz-muted">
           Powered by <span className="text-tz-gold font-medium">TreinoZap</span>
         </p>
+        <a href="/aluno/login" className="text-xs text-tz-muted underline underline-offset-2 hover:text-tz-white transition-colors">
+          Acessar com meu email
+        </a>
       </div>
     </div>
   )
