@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MetricCard, StudentCard, Button } from '@treinozap/ui'
 import { useStudents, useInactiveStudents } from '@hooks/useStudents'
@@ -9,6 +9,25 @@ type PendingRequest = {
   message: string | null
   created_at: string
   students: { id: string; name: string; goal: string | null; email: string | null }
+}
+
+type ActivityEntry = {
+  id: string
+  created_at: string
+  student_id: string
+  workout_id: string | null
+  students: { name: string } | null
+  workouts: { title: string } | null
+}
+
+function timeAgo(date: string) {
+  const diff = Date.now() - new Date(date).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'agora'
+  if (mins < 60) return `${mins}min atrás`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h atrás`
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(date))
 }
 
 function usePendingRequests() {
@@ -91,6 +110,44 @@ function usePendingRequests() {
   return { requests, isLoading, trainerId, proposeContract, reject }
 }
 
+function useRecentActivity(studentIds: string[]) {
+  const [activity, setActivity] = useState<ActivityEntry[]>([])
+
+  const load = useCallback(async () => {
+    if (studentIds.length === 0) { setActivity([]); return }
+
+    const { data } = await supabase
+      .from('activity_logs')
+      .select('id, created_at, student_id, workout_id, students(name), workouts(title)')
+      .eq('event', 'completed_workout')
+      .in('student_id', studentIds)
+      .order('created_at', { ascending: false })
+      .limit(15)
+
+    setActivity((data as ActivityEntry[]) ?? [])
+  }, [studentIds.join(',')])
+
+  useEffect(() => {
+    load()
+
+    if (studentIds.length === 0) return
+
+    const channel = supabase
+      .channel('activity_realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'activity_logs',
+        filter: `event=eq.completed_workout`,
+      }, () => load())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [load])
+
+  return { activity, reload: load }
+}
+
 export function DashboardPage() {
   const { students, isLoading } = useStudents()
   const { students: inactive } = useInactiveStudents(7)
@@ -107,6 +164,9 @@ export function DashboardPage() {
   const estimatedRevenue = students
     .filter((s) => s.status === 'active' && s.monthly_fee)
     .reduce((acc, s) => acc + (s.monthly_fee ?? 0), 0)
+
+  const studentIds = students.map((s) => s.id)
+  const { activity } = useRecentActivity(studentIds)
 
   function openProposal(reqId: string) {
     setProposingId(reqId)
@@ -198,7 +258,6 @@ export function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Formulário de proposta inline */}
                 {proposingId === req.id ? (
                   <div className="flex flex-col gap-3 border-t border-tz-border pt-3">
                     <p className="text-xs font-medium text-tz-gold">Proposta de contrato para {req.students.name}</p>
@@ -258,6 +317,45 @@ export function DashboardPage() {
                 )}
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Atividade recente — treinos concluídos */}
+      {activity.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="tz-section-title">Atividade recente</h2>
+            <span className="flex h-2 w-2 rounded-full bg-tz-electric animate-pulse" />
+          </div>
+          <div className="tz-card p-0 overflow-hidden divide-y divide-white/5">
+            {activity.map((entry) => {
+              const name = entry.students?.name ?? 'Aluno'
+              const workout = entry.workouts?.title ?? 'Treino'
+              const initial = name.charAt(0).toUpperCase()
+              const isRecent = Date.now() - new Date(entry.created_at).getTime() < 3600000
+
+              return (
+                <div key={entry.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="relative shrink-0">
+                    <div className="h-8 w-8 rounded-full bg-tz-gold/10 border border-tz-gold/20 flex items-center justify-center">
+                      <span className="text-xs font-bold text-tz-gold">{initial}</span>
+                    </div>
+                    {isRecent && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-tz-electric border-2 border-tz-surface" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-tz-white">
+                      <span className="font-semibold">{name}</span>
+                      <span className="text-tz-muted"> concluiu </span>
+                      <span className="text-tz-electric truncate">{workout}</span>
+                    </p>
+                  </div>
+                  <span className="text-2xs text-tz-muted shrink-0">{timeAgo(entry.created_at)}</span>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

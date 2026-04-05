@@ -96,6 +96,13 @@ export function ChatPage() {
 
     setIsSending(false)
     inputRef.current?.focus()
+
+    // Notifica o outro lado — fire and forget
+    const { data: { session: s } } = await supabase.auth.getSession()
+    supabase.functions.invoke('notify-chat-message', {
+      body: { conversation_id: conversationId, sender_id: myId, content, app_url: window.location.origin },
+      headers: s?.access_token ? { Authorization: `Bearer ${s.access_token}` } : undefined,
+    }).catch(() => {})
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {

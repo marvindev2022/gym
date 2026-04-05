@@ -225,11 +225,28 @@ export function AlunoPage() {
 
   async function openChat() {
     if (!hasTrainer || !student.id || !session) return
-    const { data: conv } = await supabase
+
+    // Tenta buscar conversa existente primeiro (evita falha de RLS no INSERT)
+    let { data: conv } = await supabase
       .from('conversations')
-      .upsert({ student_id: student.id, trainer_id: s.trainer_id }, { onConflict: 'student_id,trainer_id' })
       .select('id')
-      .single()
+      .eq('student_id', student.id)
+      .eq('trainer_id', s.trainer_id)
+      .maybeSingle()
+
+    if (!conv) {
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({ student_id: student.id, trainer_id: s.trainer_id })
+        .select('id')
+        .single()
+      if (error) {
+        alert('Não foi possível abrir o chat. Peça ao seu professor para iniciar a conversa.')
+        return
+      }
+      conv = newConv
+    }
+
     if (conv) navigate(`/chat/${conv.id}`)
   }
 
