@@ -61,7 +61,7 @@ export function ChatPage() {
 
     load()
 
-    // Realtime: mensagens novas chegam instantaneamente
+    // Realtime: mensagens do OUTRO lado chegam instantaneamente
     const channel = supabase
       .channel(`chat_${conversationId}`)
       .on('postgres_changes', {
@@ -70,7 +70,12 @@ export function ChatPage() {
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
       }, (payload) => {
-        setMessages((prev) => [...prev, payload.new as Message])
+        const incoming = payload.new as Message
+        // Ignora se já está na lista (evita duplicata do optimistic update)
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev
+          return [...prev, incoming]
+        })
       })
       .subscribe()
 
@@ -88,11 +93,25 @@ export function ChatPage() {
     setText('')
     setIsSending(true)
 
-    await supabase.from('messages').insert({
-      conversation_id: conversationId,
+    // Optimistic: aparece imediatamente sem esperar o realtime
+    const tempId = `temp-${Date.now()}`
+    setMessages((prev) => [...prev, {
+      id: tempId,
       sender_id: myId,
       content,
-    })
+      created_at: new Date().toISOString(),
+    }])
+
+    const { data: inserted } = await supabase
+      .from('messages')
+      .insert({ conversation_id: conversationId, sender_id: myId, content })
+      .select('id, sender_id, content, created_at')
+      .single()
+
+    // Substitui o temp pelo ID real do banco
+    if (inserted) {
+      setMessages((prev) => prev.map((m) => m.id === tempId ? inserted : m))
+    }
 
     setIsSending(false)
     inputRef.current?.focus()
