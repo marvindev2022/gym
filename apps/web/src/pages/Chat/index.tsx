@@ -57,7 +57,7 @@ function isSameCluster(a: Message, b: Message) {
 export function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
   const navigate = useNavigate()
-  const { session } = useAuth()
+  const { session, isLoading: authLoading } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([])
   const [meta, setMeta] = useState<ConversationMeta | null>(null)
@@ -68,8 +68,8 @@ export function ChatPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const typingTimeoutRef = useRef<number | null>(null)
+  const channelRef = useRef<any>(null)
 
   const myId = session?.user.id
 
@@ -199,6 +199,14 @@ export function ChatPage() {
       e.preventDefault()
       sendMessage()
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[100dvh] bg-tz-bg flex items-center justify-center">
+        <div className="h-6 w-6 border-2 border-tz-gold border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   if (!session) {

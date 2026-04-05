@@ -136,11 +136,21 @@ export function StudentDetailPage() {
     const { data: trainer } = await supabase.from('trainers').select('id').eq('user_id', user.id).single()
     if (!trainer) return
 
-    const { data: conv } = await supabase
+    let { data: conv } = await supabase
       .from('conversations')
-      .upsert({ student_id: id!, trainer_id: trainer.id }, { onConflict: 'student_id,trainer_id' })
       .select('id')
+      .eq('student_id', id!)
+      .eq('trainer_id', trainer.id)
       .single()
+
+    if (!conv) {
+      const { data: inserted } = await supabase
+        .from('conversations')
+        .insert({ student_id: id!, trainer_id: trainer.id })
+        .select('id')
+        .single()
+      conv = inserted
+    }
 
     if (conv) navigate(`/chat/${conv.id}`)
   }
@@ -185,7 +195,7 @@ export function StudentDetailPage() {
       </button>
 
       {/* Perfil */}
-      <div className="tz-card flex items-start gap-4">
+      <div className="tz-card p-4 flex items-start gap-4">
         <Avatar name={student.name} size="lg" />
         <div className="flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -222,7 +232,7 @@ export function StudentDetailPage() {
 
       {/* Info financeira */}
       {(student.monthly_fee || student.payment_due_day) && (
-        <div className="tz-card">
+        <div className="tz-card p-4">
           <h2 className="tz-section-title mb-3">Financeiro</h2>
           <div className="flex gap-6">
             {student.monthly_fee && (
@@ -251,7 +261,7 @@ export function StudentDetailPage() {
           sedentary: 'Sedentário', beginner: 'Iniciante', intermediate: 'Intermediário', advanced: 'Avançado',
         }
         return (
-          <div className="tz-card flex flex-col gap-4">
+          <div className="tz-card p-4 flex flex-col gap-4">
             <h2 className="tz-section-title">Histórico médico / Avaliação</h2>
             {!hasMed ? (
               <p className="text-sm text-tz-muted">Aluno ainda não preencheu o histórico médico.</p>
