@@ -68,6 +68,18 @@ export function AlunoPage() {
     }
 
     load()
+
+    // Realtime: atualiza quando trainer_id ou status do aluno mudar
+    const channel = supabase
+      .channel(`student_${token}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'students',
+      }, () => { load() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [token])
 
   function openEdit() {
