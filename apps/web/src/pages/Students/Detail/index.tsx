@@ -5,11 +5,19 @@ import { getStudent, updateStudent } from '@services/students'
 import { supabase } from '@lib/supabase'
 import type { Student, WorkoutWithExercises } from '@treinozap/types'
 
-function MedStat({ label, value, highlight, muted }: { label: string; value: string; highlight?: boolean; muted?: boolean }) {
+function imcColor(imc: number) {
+  if (imc < 18.5) return 'text-tz-electric'
+  if (imc < 25)   return 'text-green-400'
+  if (imc < 30)   return 'text-yellow-400'
+  if (imc < 35)   return 'text-orange-400'
+  return 'text-tz-error'
+}
+
+function MedStat({ label, value, color, highlight, muted }: { label: string; value: string; color?: string; highlight?: boolean; muted?: boolean }) {
   return (
     <div>
       <span className="text-2xs text-tz-muted uppercase tracking-wide">{label}</span>
-      <p className={`font-mono text-base font-bold mt-0.5 ${highlight ? 'text-tz-electric' : muted ? 'text-tz-muted' : 'text-tz-white'}`}>{value}</p>
+      <p className={`font-mono text-base font-bold mt-0.5 ${color ?? (highlight ? 'text-tz-electric' : muted ? 'text-tz-muted' : 'text-tz-white')}`}>{value}</p>
     </div>
   )
 }
@@ -305,9 +313,10 @@ export function StudentDetailPage() {
                     {s.age && <MedStat label="Idade" value={`${s.age} anos`} />}
                     {s.weight && <MedStat label="Peso" value={`${s.weight} kg`} />}
                     {s.height && <MedStat label="Altura" value={`${s.height} cm`} />}
-                    {s.weight && s.height && (
-                      <MedStat label="IMC" value={(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)} highlight />
-                    )}
+                    {s.weight && s.height && (() => {
+                      const imc = s.weight / Math.pow(s.height / 100, 2)
+                      return <MedStat label="IMC" value={imc.toFixed(1)} color={imcColor(imc)} />
+                    })()}
                     {s.goal_weight && <MedStat label="Peso objetivo" value={`${s.goal_weight} kg`} muted />}
                   </div>
                 )}

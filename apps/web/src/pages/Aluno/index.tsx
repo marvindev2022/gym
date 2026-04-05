@@ -17,11 +17,19 @@ const FITNESS_LEVELS = [
   { value: 'advanced', label: 'Avançado' },
 ]
 
-function StatItem({ label, value, highlight, muted }: { label: string; value: string; highlight?: boolean; muted?: boolean }) {
+function imcColor(imc: number) {
+  if (imc < 18.5) return 'text-tz-electric'
+  if (imc < 25)   return 'text-green-400'
+  if (imc < 30)   return 'text-yellow-400'
+  if (imc < 35)   return 'text-orange-400'
+  return 'text-tz-error'
+}
+
+function StatItem({ label, value, color, muted }: { label: string; value: string; color?: string; muted?: boolean }) {
   return (
     <div>
       <p className="text-2xs text-tz-muted uppercase tracking-wide">{label}</p>
-      <p className={`font-mono text-base font-bold mt-0.5 ${highlight ? 'text-tz-electric' : muted ? 'text-tz-muted' : 'text-tz-white'}`}>{value}</p>
+      <p className={`font-mono text-base font-bold mt-0.5 ${color ?? (muted ? 'text-tz-muted' : 'text-tz-white')}`}>{value}</p>
     </div>
   )
 }
@@ -658,13 +666,10 @@ export function AlunoPage() {
                   {s.age && <StatItem label="Idade" value={`${s.age} anos`} />}
                   {s.weight && <StatItem label="Peso" value={`${s.weight} kg`} />}
                   {s.height && <StatItem label="Altura" value={`${s.height} cm`} />}
-                  {s.weight && s.height && (
-                    <StatItem
-                      label="IMC"
-                      value={(s.weight / Math.pow(s.height / 100, 2)).toFixed(1)}
-                      highlight
-                    />
-                  )}
+                  {s.weight && s.height && (() => {
+                    const imc = s.weight / Math.pow(s.height / 100, 2)
+                    return <StatItem label="IMC" value={imc.toFixed(1)} color={imcColor(imc)} />
+                  })()}
                   {s.goal_weight && <StatItem label="Peso objetivo" value={`${s.goal_weight} kg`} muted />}
                 </div>
               )}
