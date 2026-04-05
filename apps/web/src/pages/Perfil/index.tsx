@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@lib/supabase'
 import { Button, Input } from '@treinozap/ui'
+import { usePushNotifications } from '@hooks/usePushNotifications'
 
 const SPECIALTY_OPTIONS = [
   'Musculação', 'Emagrecimento', 'Hipertrofia', 'Funcional', 'HIIT',
@@ -15,6 +17,8 @@ const BR_STATES = [
 type AttendanceMode = 'online' | 'presencial' | 'ambos'
 
 export function PerfilPage() {
+  const navigate = useNavigate()
+  const { status: pushStatus, subscribe } = usePushNotifications()
   const [trainerId, setTrainerId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -269,6 +273,42 @@ export function PerfilPage() {
           {saved ? '✓ Salvo!' : 'Salvar perfil'}
         </Button>
       </form>
+
+      {/* Ações da conta */}
+      <div className="tz-card flex flex-col gap-2 mt-2">
+        <h2 className="tz-section-title mb-1">Conta</h2>
+
+        {pushStatus === 'default' && (
+          <button
+            onClick={subscribe}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-tz-sm text-sm font-medium text-tz-gold hover:bg-tz-gold/10 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+            Ativar notificações
+          </button>
+        )}
+
+        {pushStatus === 'granted' && (
+          <p className="text-xs text-tz-muted px-3 py-2 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Notificações ativadas
+          </p>
+        )}
+
+        <button
+          onClick={async () => { await supabase.auth.signOut(); navigate('/login') }}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-tz-sm text-sm font-medium text-tz-muted hover:text-tz-error hover:bg-tz-error/10 transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          Sair da conta
+        </button>
+      </div>
     </div>
   )
 }
