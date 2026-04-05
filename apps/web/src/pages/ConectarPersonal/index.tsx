@@ -205,7 +205,18 @@ export function ConectarPersonalPage() {
             </form>
 
             <button
-              onClick={() => navigate('/meu-portal')}
+              onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                  const { data: st } = await supabase
+                    .from('students')
+                    .select('student_token')
+                    .eq('user_id', user.id)
+                    .single()
+                  if (st?.student_token) { navigate(`/aluno/${st.student_token}`); return }
+                }
+                navigate('/professores')
+              }}
               className="text-xs text-tz-muted text-center hover:text-tz-white transition-colors"
             >
               Pular por agora →
