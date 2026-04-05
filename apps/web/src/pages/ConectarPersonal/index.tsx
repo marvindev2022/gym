@@ -80,6 +80,20 @@ export function ConectarPersonalPage() {
 
     setStep('sent')
 
+    // Notifica o personal (WhatsApp + email) — fire and forget
+    const { data: { session } } = await supabase.auth.getSession()
+    supabase.functions.invoke('notify-trainer-request', {
+      body: {
+        trainer_id: trainer.id,
+        student_name: user.user_metadata?.name ?? user.email ?? 'Aluno',
+        student_message: message || null,
+        app_url: window.location.origin,
+      },
+      headers: session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : undefined,
+    }).catch(() => {}) // silencia erro de notificação
+
     // Redireciona pro portal do aluno após 3s
     setTimeout(() => {
       if (student.student_token) {

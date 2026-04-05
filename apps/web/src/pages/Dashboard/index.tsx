@@ -52,7 +52,21 @@ function usePendingRequests() {
     setRequests((prev) => prev.filter((r) => r.id !== requestId))
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+
+    // Real-time: atualiza quando chega nova solicitação
+    const channel = supabase
+      .channel('trainer_requests_notify')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'trainer_requests',
+      }, () => { load() })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   return { requests, isLoading, accept, reject }
 }
