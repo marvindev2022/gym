@@ -1,6 +1,10 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@contexts/auth'
 import { usePushNotifications } from '@hooks/usePushNotifications'
+import { supabase } from '@lib/supabase'
+
+type ChatToast = { conversationId: string; senderName: string; content: string }
 
 const navItems = [
   {
@@ -48,9 +52,76 @@ const navItems = [
 ]
 
 export function AppLayout() {
-  const { signOut } = useAuth()
+  const { signOut, session } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const { status: pushStatus, subscribe } = usePushNotifications()
+
+  const myId = session?.user.id
+
+  // Guarda location atual sem re-criar o subscription a cada mudança de rota
+  const locationRef = useRef(location)
+  useEffect(() => { locationRef.current = location }, [location])
+
+  // Cache: conversationId → nome do aluno
+  const convNamesRef = useRef<Map<string, string>>(new Map())
+
+  const [toast, setToast] = useState<ChatToast | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+
+  // Carrega nomes das conversas para exibir no toast
+  useEffect(() => {
+    if (!myId) return
+    supabase
+      .from('conversations')
+      .select('id, students(name)')
+      .then(({ data }) => {
+        data?.forEach((c: any) => {
+          if (c.students?.name) convNamesRef.current.set(c.id, c.students.name)
+        })
+      })
+  }, [myId])
+
+  // Listener global: notifica quando qualquer aluno envia mensagem
+  useEffect(() => {
+    if (!myId) return
+
+    const channel = supabase
+      .channel('global_new_messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      }, (payload) => {
+        const msg = payload.new as any
+        if (msg.sender_id === myId) return // mensagem própria, ignora
+
+        const convId = msg.conversation_id
+        if (locationRef.current.pathname === `/chat/${convId}`) return // já está nesse chat
+
+        // Adiciona ao cache se ainda não estava
+        if (!convNamesRef.current.has(convId)) {
+          supabase
+            .from('conversations')
+            .select('students(name)')
+            .eq('id', convId)
+            .single()
+            .then(({ data }) => {
+              const name = (data as any)?.students?.name
+              if (name) convNamesRef.current.set(convId, name)
+            })
+        }
+
+        const senderName = convNamesRef.current.get(convId) ?? 'Aluno'
+
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+        setToast({ conversationId: convId, senderName, content: msg.content })
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [myId])
 
   async function handleSignOut() {
     await signOut()
@@ -59,6 +130,27 @@ export function AppLayout() {
 
   return (
     <div className="flex h-[100dvh] bg-tz-bg">
+      {/* Toast de nova mensagem */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-tz-surface border border-tz-border rounded-tz shadow-xl p-3 flex items-center gap-3 w-[300px] animate-fade-in">
+          <div className="h-9 w-9 rounded-full bg-tz-electric/10 flex items-center justify-center shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-tz-electric">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-tz-white">{toast.senderName}</p>
+            <p className="text-xs text-tz-muted truncate mt-0.5">{toast.content}</p>
+          </div>
+          <button
+            onClick={() => { navigate(`/chat/${toast.conversationId}`); setToast(null) }}
+            className="text-tz-electric text-xs font-bold shrink-0 hover:text-tz-electric/80 transition-colors"
+          >
+            Ver
+          </button>
+        </div>
+      )}
+
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-60 flex-col border-r border-tz-border bg-tz-surface">
         <div className="flex items-center gap-2 px-5 py-6 border-b border-tz-border">

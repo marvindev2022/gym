@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@lib/supabase'
 import { Badge, Avatar } from '@treinozap/ui'
 import { useAuth } from '@contexts/auth'
+import { usePushNotifications } from '@hooks/usePushNotifications'
 import type { Student, WorkoutWithExercises } from '@treinozap/types'
 
 const BR_STATES = [
@@ -43,6 +44,7 @@ export function AlunoPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const { session, signOut } = useAuth()
+  const { status: pushStatus, subscribe: subscribePush } = usePushNotifications()
   const [student, setStudent] = useState<Student | null>(null)
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -390,6 +392,19 @@ export function AlunoPage() {
               <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
             </svg>
             Conversar com professor
+          </button>
+        )}
+
+        {/* Ativar notificações push — só aparece se ainda não permitiu */}
+        {session && pushStatus === 'default' && (
+          <button
+            onClick={subscribePush}
+            className="mt-2 flex items-center justify-center gap-2 w-full py-2.5 rounded-tz border border-tz-border text-tz-muted text-sm hover:text-tz-white hover:border-tz-muted active:scale-95 transition-all"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+            Ativar notificações de mensagem
           </button>
         )}
 
