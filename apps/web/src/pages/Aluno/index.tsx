@@ -44,7 +44,7 @@ export function AlunoPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const { session, signOut } = useAuth()
-  const { status: pushStatus, subscribe: subscribePush } = usePushNotifications()
+  const { status: pushStatus, isSubscribing: isPushSubscribing, subscribeError: pushError, subscribeSuccess: pushSuccess, subscribe: subscribePush } = usePushNotifications()
   const [student, setStudent] = useState<Student | null>(null)
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -395,17 +395,28 @@ export function AlunoPage() {
           </button>
         )}
 
-        {/* Ativar notificações push — só aparece se ainda não permitiu */}
-        {session && pushStatus === 'default' && (
-          <button
-            onClick={subscribePush}
-            className="mt-2 flex items-center justify-center gap-2 w-full py-2.5 rounded-tz border border-tz-border text-tz-muted text-sm hover:text-tz-white hover:border-tz-muted active:scale-95 transition-all"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-            </svg>
-            Ativar notificações de mensagem
-          </button>
+        {/* Ativar notificações push */}
+        {session && (pushStatus === 'default' || pushError || pushSuccess) && (
+          <div className="mt-2 flex flex-col gap-1">
+            {pushError && <p className="text-xs text-tz-error text-center">{pushError}</p>}
+            {pushSuccess && <p className="text-xs text-green-400 text-center">✓ Notificações ativadas!</p>}
+            {pushStatus === 'default' && (
+              <button
+                onClick={subscribePush}
+                disabled={isPushSubscribing}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-tz border border-tz-border text-tz-muted text-sm hover:text-tz-white hover:border-tz-muted active:scale-95 transition-all disabled:opacity-60"
+              >
+                {isPushSubscribing ? (
+                  <div className="h-4 w-4 border-2 border-tz-muted border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                  </svg>
+                )}
+                {isPushSubscribing ? 'Ativando...' : 'Ativar notificações de mensagem'}
+              </button>
+            )}
+          </div>
         )}
 
         {/* Form edição perfil */}

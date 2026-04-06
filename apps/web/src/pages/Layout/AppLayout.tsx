@@ -55,7 +55,7 @@ export function AppLayout() {
   const { signOut, session } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { status: pushStatus, subscribe } = usePushNotifications()
+  const { status: pushStatus, isSubscribing, subscribeError, subscribeSuccess, subscribe } = usePushNotifications()
 
   const myId = session?.user.id
 
@@ -69,58 +69,50 @@ export function AppLayout() {
   const [toast, setToast] = useState<ChatToast | null>(null)
   const toastTimerRef = useRef<number | null>(null)
 
-  // Carrega nomes das conversas para exibir no toast
+  // Carrega conversas e subscreve cada uma individualmente (filtro explícito é mais confiável com RLS)
   useEffect(() => {
     if (!myId) return
+
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
     supabase
       .from('conversations')
       .select('id, students(name)')
       .then(({ data }) => {
-        data?.forEach((c: any) => {
+        if (!data || data.length === 0) return
+
+        data.forEach((c: any) => {
           if (c.students?.name) convNamesRef.current.set(c.id, c.students.name)
         })
-      })
-  }, [myId])
 
-  // Listener global: notifica quando qualquer aluno envia mensagem
-  useEffect(() => {
-    if (!myId) return
+        channel = supabase.channel('global_new_messages')
 
-    const channel = supabase
-      .channel('global_new_messages')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-      }, (payload) => {
-        const msg = payload.new as any
-        if (msg.sender_id === myId) return // mensagem própria, ignora
+        for (const conv of data) {
+          const convId = conv.id
+          const senderName = (conv as any).students?.name ?? 'Aluno'
 
-        const convId = msg.conversation_id
-        if (locationRef.current.pathname === `/chat/${convId}`) return // já está nesse chat
+          channel.on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convId}`,
+          }, (payload) => {
+            const msg = payload.new as any
+            if (msg.sender_id === myId) return
+            if (locationRef.current.pathname === `/chat/${convId}`) return
 
-        // Adiciona ao cache se ainda não estava
-        if (!convNamesRef.current.has(convId)) {
-          supabase
-            .from('conversations')
-            .select('students(name)')
-            .eq('id', convId)
-            .single()
-            .then(({ data }) => {
-              const name = (data as any)?.students?.name
-              if (name) convNamesRef.current.set(convId, name)
-            })
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+            setToast({ conversationId: convId, senderName, content: msg.content })
+            toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
+          })
         }
 
-        const senderName = convNamesRef.current.get(convId) ?? 'Aluno'
-
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-        setToast({ conversationId: convId, senderName, content: msg.content })
-        toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
+        channel.subscribe()
       })
-      .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [myId])
 
   async function handleSignOut() {
@@ -180,16 +172,31 @@ export function AppLayout() {
         </nav>
 
         <div className="px-3 pb-4 flex flex-col gap-1">
-          {pushStatus === 'default' && (
-            <button
-              onClick={subscribe}
-              className="flex w-full items-center gap-3 rounded-tz-sm px-3 py-2.5 text-sm font-medium text-tz-gold hover:bg-tz-gold/10 transition-colors"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-              </svg>
-              Ativar notificações
-            </button>
+          {(pushStatus === 'default' || subscribeSuccess || subscribeError) && (
+            <div className="flex flex-col gap-1">
+              {subscribeError && (
+                <p className="text-xs text-tz-error px-3">{subscribeError}</p>
+              )}
+              {subscribeSuccess && (
+                <p className="text-xs text-green-400 px-3">✓ Notificações ativadas!</p>
+              )}
+              {pushStatus === 'default' && (
+                <button
+                  onClick={subscribe}
+                  disabled={isSubscribing}
+                  className="flex w-full items-center gap-3 rounded-tz-sm px-3 py-2.5 text-sm font-medium text-tz-gold hover:bg-tz-gold/10 transition-colors disabled:opacity-60"
+                >
+                  {isSubscribing ? (
+                    <div className="h-4 w-4 border-2 border-tz-gold border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                    </svg>
+                  )}
+                  {isSubscribing ? 'Ativando...' : 'Ativar notificações'}
+                </button>
+              )}
+            </div>
           )}
           <button
             onClick={handleSignOut}

@@ -12,6 +12,9 @@ export type PushStatus = 'unsupported' | 'denied' | 'granted' | 'default' | 'loa
 
 export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>('loading')
+  const [isSubscribing, setIsSubscribing] = useState(false)
+  const [subscribeError, setSubscribeError] = useState<string | null>(null)
+  const [subscribeSuccess, setSubscribeSuccess] = useState(false)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -22,11 +25,23 @@ export function usePushNotifications() {
   }, [])
 
   async function subscribe(): Promise<boolean> {
-    if (!('serviceWorker' in navigator)) return false
+    if (!('serviceWorker' in navigator)) {
+      setSubscribeError('Seu navegador não suporta notificações push.')
+      return false
+    }
+
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+    if (!vapidKey) {
+      setSubscribeError('Chave VAPID não configurada.')
+      return false
+    }
+
+    setIsSubscribing(true)
+    setSubscribeError(null)
+    setSubscribeSuccess(false)
 
     try {
       const registration = await navigator.serviceWorker.ready
-      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
       const pushSub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -34,20 +49,37 @@ export function usePushNotifications() {
       })
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return false
+      if (!user) {
+        setSubscribeError('Faça login para ativar notificações.')
+        return false
+      }
 
-      await supabase
+      const { error } = await supabase
         .from('push_subscriptions')
         .upsert({ user_id: user.id, subscription: pushSub.toJSON() }, { onConflict: 'user_id' })
 
+      if (error) {
+        setSubscribeError('Erro ao salvar subscription. Tente novamente.')
+        return false
+      }
+
       setStatus('granted')
+      setSubscribeSuccess(true)
+      setTimeout(() => setSubscribeSuccess(false), 3000)
       return true
-    } catch (e) {
-      console.error('[push] subscribe error:', e)
+    } catch (e: any) {
+      if (e?.name === 'NotAllowedError') {
+        setStatus('denied')
+        setSubscribeError('Permissão negada. Habilite nas configurações do navegador.')
+      } else {
+        setSubscribeError('Não foi possível ativar. Tente novamente.')
+      }
       setStatus(Notification.permission as PushStatus)
       return false
+    } finally {
+      setIsSubscribing(false)
     }
   }
 
-  return { status, subscribe }
+  return { status, isSubscribing, subscribeError, subscribeSuccess, subscribe }
 }
