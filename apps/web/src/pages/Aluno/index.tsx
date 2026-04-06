@@ -279,7 +279,8 @@ export function AlunoPage() {
 
   async function handleLogout() {
     await signOut()
-    navigate('/aluno/login')
+    // Volta pro próprio portal (público) — o aluno vê os dados mas sem edição
+    navigate(`/aluno/${token}`, { replace: true })
   }
 
   async function openChat() {
@@ -332,7 +333,7 @@ export function AlunoPage() {
             </div>
             <span className="text-xs text-tz-muted font-medium">TreinoZap</span>
           </div>
-          {canEdit && (
+          {!!session && (
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 text-xs text-tz-muted hover:text-tz-error transition-all active:scale-95 px-2 py-1 rounded-tz-sm"
